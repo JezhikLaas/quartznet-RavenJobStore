@@ -323,10 +323,13 @@ public partial class RavenJobStore
     public static partial void LogUnresolvableConcurrencyProblem(ILogger logger, Exception error);
 
     [LoggerMessage(Level = LogLevel.Trace, EventId = 3, Message = "Enter {name}")]
-    public static partial void LogEnter(ILogger logger, [CallerMemberName]string? name = null);
+    public static partial void TraceEnter(ILogger logger, [CallerMemberName]string? name = null);
 
     [LoggerMessage(Level = LogLevel.Trace, EventId = 4, Message = "Exit {name}")]
-    public static partial void LogExit(ILogger logger, [CallerMemberName]string? name = null);
+    public static partial void TraceExit(ILogger logger, [CallerMemberName]string? name = null);
+
+    [LoggerMessage(Level = LogLevel.Trace, EventId = 5, Message = "Exit {name} with {result}")]
+    public static partial void TraceExit(ILogger logger, object? result, [CallerMemberName]string? name = null);
 }
 
 public static class SortedSetExtensions

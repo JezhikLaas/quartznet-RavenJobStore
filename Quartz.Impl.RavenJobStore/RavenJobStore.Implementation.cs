@@ -50,7 +50,7 @@ public partial class RavenJobStore
 
     internal async Task SchedulerStartedAsync(CancellationToken token)
     {
-        LogEnter(Logger);
+        TraceEnter(Logger);
         
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
@@ -66,7 +66,7 @@ public partial class RavenJobStore
                 .SaveChangesAsync(token)
                 .ConfigureAwait(false);
 
-            LogExit(Logger);
+            TraceExit(Logger);
             return;
         }
 
@@ -74,7 +74,7 @@ public partial class RavenJobStore
         try
         {
             await RecoverJobStoreAsync(session, token).ConfigureAwait(false);
-            LogExit(Logger);
+            TraceExit(Logger);
         }
         catch (SchedulerException error)
         {
@@ -84,7 +84,7 @@ public partial class RavenJobStore
 
     internal async Task SetSchedulerStateAsync(SchedulerState state, CancellationToken cancellationToken)
     {
-        LogEnter(Logger);
+        TraceEnter(Logger);
         
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
         var scheduler = await session
@@ -95,7 +95,7 @@ public partial class RavenJobStore
 
         await session.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        LogExit(Logger);
+        TraceExit(Logger);
     }
     
     internal async Task StoreJobAndTriggerAsync(
@@ -103,7 +103,7 @@ public partial class RavenJobStore
         IOperableTrigger newTrigger,
         CancellationToken cancellationToken)
     {
-        LogEnter(Logger);
+        TraceEnter(Logger);
         
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
         var jobToStore = new Job(newJob, InstanceName);
@@ -127,46 +127,68 @@ public partial class RavenJobStore
             .SaveChangesAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        LogExit(Logger);
+        TraceExit(Logger);
     }
 
     internal async Task<bool> IsJobGroupPausedAsync(string groupName, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        return scheduler.ThrowIfNull().PausedJobGroups.Contains(groupName);
+        var result = scheduler.ThrowIfNull().PausedJobGroups.Contains(groupName);
+
+        TraceExit(Logger, result);
+        
+        return result;
     }
 
     internal async Task<bool> IsTriggerGroupPausedAsync(string groupName, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
-        return await IsTriggerGroupPausedAsync(session, groupName, token).ConfigureAwait(false);
+        var result =  await IsTriggerGroupPausedAsync(session, groupName, token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task StoreJobAsync(IJobDetail newJob, bool replaceExisting, CancellationToken token)
+    internal async Task StoreJobAsync(IJobDetail newJob, bool replaceExisting, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         if (await session.Advanced.ExistsAsync(newJob.Key.GetDatabaseId(), token).ConfigureAwait(false))
         {
-            if (replaceExisting == false) throw new ObjectAlreadyExistsException(newJob);
+            if (replaceExisting == false)
+            {
+                TraceExit(Logger, nameof(ObjectAlreadyExistsException));
+                throw new ObjectAlreadyExistsException(newJob);
+            }
         }
 
         var job = new Job(newJob, InstanceName);
 
         await session.StoreAsync(job, job.Key, token).ConfigureAwait(false);
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task StoreJobsAndTriggersAsync(
+    internal async Task StoreJobsAndTriggersAsync(
         IReadOnlyDictionary<IJobDetail, IReadOnlyCollection<ITrigger>> triggersAndJobs,
         bool replace,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         if (replace == false)
@@ -177,7 +199,11 @@ public partial class RavenJobStore
                 select trigger
             ).AnyAsync(token).ConfigureAwait(false);
 
-            if (triggerExists) throw new ObjectAlreadyExistsException("At least one trigger already exists");
+            if (triggerExists)
+            {
+                TraceExit(Logger, nameof(ObjectAlreadyExistsException));
+                throw new ObjectAlreadyExistsException("At least one trigger already exists");
+            }
             
             var jobExists = await (
                 from job in session.Query<Job>()
@@ -185,7 +211,11 @@ public partial class RavenJobStore
                 select job
             ).AnyAsync(token).ConfigureAwait(false);
 
-            if (jobExists) throw new ObjectAlreadyExistsException("At least one job already exists");
+            if (jobExists)
+            {
+                TraceExit(Logger, nameof(ObjectAlreadyExistsException));
+                throw new ObjectAlreadyExistsException("At least one job already exists");
+            }
         }
         
         await using var bulkInsert = DocumentStore.BulkInsert(token: token);
@@ -229,10 +259,14 @@ public partial class RavenJobStore
                     .ConfigureAwait(false);
             }
         }
+        
+        TraceExit(Logger);
     }
 
-    private async Task<bool> RemoveJobAsync(JobKey jobKey, CancellationToken token)
+    internal async Task<bool> RemoveJobAsync(JobKey jobKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var jobExists = await session.Advanced
@@ -241,6 +275,7 @@ public partial class RavenJobStore
 
         if (jobExists == false)
         {
+            TraceExit(Logger, false);
             return false;
         }
 
@@ -250,11 +285,14 @@ public partial class RavenJobStore
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
 
+        TraceExit(Logger, true);
         return true;
     }
 
-    private async Task<bool> RemoveJobsAsync(IReadOnlyCollection<JobKey> jobKeys, CancellationToken token)
+    internal async Task<bool> RemoveJobsAsync(IReadOnlyCollection<JobKey> jobKeys, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         foreach (var jobKey in jobKeys)
@@ -265,26 +303,36 @@ public partial class RavenJobStore
         await session
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger, true);
 
         return true;
     }
 
-    public async Task<IJobDetail?> RetrieveJobAsync(JobKey jobKey, CancellationToken token)
+    internal async Task<IJobDetail?> RetrieveJobAsync(JobKey jobKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var job = await session
             .LoadAsync<Job>(jobKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
         
-        return job?.Deserialize();
+        var result = job?.Deserialize();
+
+        TraceExit(Logger, result);
+        
+        return result;
     }
 
-    private async Task StoreTriggerAsync(
+    internal async Task StoreTriggerAsync(
         IOperableTrigger newTrigger,
         bool replaceExisting,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var triggerExists = await session.Advanced
@@ -293,6 +341,7 @@ public partial class RavenJobStore
 
         if (triggerExists && replaceExisting == false)
         {
+            TraceExit(Logger, nameof(ObjectAlreadyExistsException));
             throw new ObjectAlreadyExistsException(newTrigger);
         }
 
@@ -302,6 +351,7 @@ public partial class RavenJobStore
 
         if (jobExists == false)
         {
+            TraceExit(Logger, nameof(JobPersistenceException));
             throw new JobPersistenceException($"The job ({newTrigger.JobKey}) referenced by the trigger does not exist.");
         }
 
@@ -314,6 +364,8 @@ public partial class RavenJobStore
         await session
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
     private async Task<bool> RemoveTriggerAsync(TriggerKey triggerKey, CancellationToken token)
