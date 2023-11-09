@@ -2,7 +2,6 @@ using FluentAssertions;
 using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Raven.Client.Documents;
-using Raven.Client.Documents.Indexes.TimeSeries;
 
 namespace Quartz.Impl.UnitTests;
 
