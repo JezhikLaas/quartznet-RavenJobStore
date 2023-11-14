@@ -14,7 +14,7 @@ public partial class RavenJobStore
 
     private static TimeSpan MisfireThresholdValue { get; set; } = TimeSpan.FromSeconds(5);
 
-    private ISchedulerSignaler Signaler { get; set; } = null!;
+    private ISchedulerSignaler Signaler { get; set; } = new SchedulerSignalerStub();
     
     private string[]? RavenNodes { get; set; } 
 

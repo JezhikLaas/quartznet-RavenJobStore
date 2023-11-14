@@ -368,15 +368,21 @@ public partial class RavenJobStore
         TraceExit(Logger);
     }
 
-    private async Task<bool> RemoveTriggerAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task<bool> RemoveTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var triggerExists = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
 
-        if (triggerExists == false) return false;
+        if (triggerExists == false)
+        {
+            TraceExit(Logger, false);
+            return false;
+        }
         
         var trigger = await session
             .Include<Trigger>(x => x.JobKey)
@@ -406,13 +412,16 @@ public partial class RavenJobStore
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
 
+        TraceExit(Logger, true);
         return true;
     }
 
-    private async Task<bool> RemoveTriggersAsync(
+    internal async Task<bool> RemoveTriggersAsync(
         IReadOnlyCollection<TriggerKey> triggerKeys,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var triggers = await session
@@ -436,6 +445,10 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
+        var triggersToKeep = triggersForJobs
+            .Where(x => triggerKeys.Any(key => key.Equals(x.TriggerKey)) == false)
+            .ToList();
+
         var existingTriggers = triggers
             .Where(x => x.Value != null)
             .Select(x => x.Value)
@@ -445,14 +458,16 @@ public partial class RavenJobStore
 
         foreach (var trigger in existingTriggers)
         {
-            var triggersForJob = triggersForJobs.Count(x => x.JobKey == trigger.JobKey);
-            if (triggersForJob == 1)
+            var triggersForJob = triggersToKeep.Count(x => x.JobKey == trigger.JobKey);
+            if (triggersForJob == 0)
             {
                 if (jobs.TryGetValue(trigger.JobKey, out var job))
                 {
                     if (job.Durable == false)
                     {
                         session.Delete(trigger.JobKey);
+
+                        jobs.Remove(trigger.JobKey);
                         await Signaler
                             .NotifySchedulerListenersJobDeleted(job.JobKey, token)
                             .ConfigureAwait(false);
@@ -464,6 +479,8 @@ public partial class RavenJobStore
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }
@@ -473,13 +490,19 @@ public partial class RavenJobStore
         IOperableTrigger newTrigger,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var exists = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
 
-        if (exists == false) return false;
+        if (exists == false)
+        {
+            TraceExit(Logger, false);
+            return false;
+        }
         
         session.Delete(triggerKey.GetDatabaseId());
 
@@ -498,6 +521,7 @@ public partial class RavenJobStore
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
 
+        TraceExit(Logger, true);
         return true;
     }
 

@@ -85,6 +85,6 @@ public class JobTypeConverter : JsonConverter<Type>
 
 internal static class JobKeyExtensions
 {
-    public static string GetDatabaseId(this JobKey jobKey) => 
-        $"{jobKey.Name}/{jobKey.Group}";
+    public static string GetDatabaseId(this JobKey? jobKey) => 
+        $"{jobKey?.Name ?? string.Empty}/{jobKey?.Group ?? string.Empty}";
 }

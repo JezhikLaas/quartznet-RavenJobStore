@@ -509,8 +509,8 @@ public class ImplementationTests : TestBase
             .ContainSingle(x => x.TriggerKey.Equals(new TriggerKey("Trigger", "Group")));
     }
 
-    [Fact(DisplayName = "If a trigger and the referenced job do not exist Then StoreTrigger will throw")]
-    public async Task If_a_trigger_and_the_referenced_job_do_not_exist_Then_StoreTrigger_will_throw()
+    [Fact(DisplayName = "If a trigger and the referenced job does not exist Then StoreTrigger will throw")]
+    public async Task If_a_trigger_and_the_referenced_job_does_not_exist_Then_StoreTrigger_will_throw()
     {
         await Target.SchedulerStartedAsync(CancellationToken.None);
 
@@ -564,7 +564,6 @@ public class ImplementationTests : TestBase
         trigger.Description = "Replace";
         
         await Target.StoreTriggerAsync(trigger, true, CancellationToken.None);
-
         
         using var session = Target.DocumentStore!.OpenAsyncSession();
         var checkTriggers = await session.Query<Trigger>().ToListAsync();
@@ -572,5 +571,331 @@ public class ImplementationTests : TestBase
         checkTriggers.Should()
             .HaveCount(1).And
             .ContainSingle(x => x.Description == "Replace");
+    }
+
+    [Fact(DisplayName = "If a trigger does not exist Then RemoveTrigger will return false")]
+    public async Task If_a_trigger_does_not_exist_Then_RemoveTrigger_will_return_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.RemoveTriggerAsync
+        (
+            new TriggerKey("unknown", "unknown"),
+            CancellationToken.None
+        );
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a trigger exists Then RemoveTrigger will delete it")]
+    public async Task If_a_trigger_exists_Then_RemoveTrigger_will_delete_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggerAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.Query<Trigger>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkTriggers.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If the associated job is not durable Then RemoveTrigger will delete it as well")]
+    public async Task If_the_associated_job_is_not_durable_Then_RemoveTrigger_will_delete_it_as_well()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggerAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If the associated job is durable Then RemoveTrigger will not delete it")]
+    public async Task If_the_associated_job_is_durable_Then_RemoveTrigger_will_not_delete_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob))
+        {
+            Durable = true,
+            Description = "Durable"
+        };
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggerAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Description == "Durable");
+    }
+
+    [Fact(DisplayName = "If more then one trigger for a job exist Then RemoveTrigger will not delete the job")]
+    public async Task If_more_then_one_trigger_for_a_job_exist_Then_RemoveTrigger_will_not_delete_the_job()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        
+        trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggerAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Name == "Job");
+    }
+
+    [Fact(DisplayName = "If a trigger does not exist Then RemoveTriggers will return false")]
+    public async Task If_a_trigger_does_not_exist_Then_RemoveTriggers_will_return_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] {new TriggerKey("unknown", "unknown") },
+            CancellationToken.None
+        );
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a trigger exists Then RemoveTriggers will delete it")]
+    public async Task If_a_trigger_exists_Then_RemoveTriggers_will_delete_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] { new TriggerKey("Trigger", "Group") },
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.Query<Trigger>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkTriggers.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If the associated job is not durable Then RemoveTriggers will delete it as well")]
+    public async Task If_the_associated_job_is_not_durable_Then_RemoveTriggers_will_delete_it_as_well()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] { new TriggerKey("Trigger", "Group") },
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If the associated job is durable Then RemoveTriggers will not delete it")]
+    public async Task If_the_associated_job_is_durable_Then_RemoveTriggers_will_not_delete_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob))
+        {
+            Durable = true,
+            Description = "Durable"
+        };
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] { new TriggerKey("Trigger", "Group") },
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Description == "Durable");
+    }
+
+    [Fact(DisplayName = "If more then one trigger for a job exist Then RemoveTriggers will not delete the job")]
+    public async Task If_more_then_one_trigger_for_a_job_exist_Then_RemoveTriggers_will_not_delete_the_job()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        
+        trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] { new TriggerKey("Trigger", "Group") },
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Name == "Job");
+    }
+
+    [Fact(DisplayName = "If all triggers for a job are removed Then RemoveTriggers will delete the job")]
+    public async Task If_all_triggers_for_a_job_are_removed_Then_RemoveTriggers_will_delete_the_job()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        
+        trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RemoveTriggersAsync
+        (
+            new[] { new TriggerKey("Trigger", "Group"), new TriggerKey("TriggerTwo", "Group") },
+            CancellationToken.None
+        );
+         
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkJobs.Should().HaveCount(0);
     }
 }
