@@ -898,4 +898,73 @@ public class ImplementationTests : TestBase
 
         checkJobs.Should().HaveCount(0);
     }
+
+    [Fact(DisplayName = "If a trigger does not exist Then ReplaceTrigger will return false and not store the new one")]
+    public async Task If_a_trigger_does_not_exist_Then_ReplaceTrigger_will_return_false_and_not_store_the_new_one()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group");
+
+        var result = await Target.ReplaceTriggerAsync(trigger.Key, trigger, CancellationToken.None);
+        
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.Query<Trigger>().ToListAsync();
+
+        result.Should().BeFalse();
+
+        checkTriggers.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If a trigger exists but the referenced job not Then ReplaceTrigger will throw")]
+    public async Task If_a_trigger_exists_but_the_referenced_job_not_Then_ReplaceTrigger_will_throw()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        trigger.JobName = "Unknown";
+        trigger.JobGroup = "Unknown";
+        
+        var call = () => Target.ReplaceTriggerAsync(trigger.Key, trigger, CancellationToken.None);
+
+        await call.Should().ThrowExactlyAsync<JobPersistenceException>();
+    }
+
+    [Fact(DisplayName = "If a trigger and job exist Then ReplaceTrigger will replace the trigger")]
+    public async Task If_a_trigger_and_job_exist_Then_ReplaceTrigger_will_replace_the_trigger()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        trigger.Description = "Replacement";
+        
+        var result = await Target.ReplaceTriggerAsync(trigger.Key, trigger, CancellationToken.None);
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.Query<Trigger>().ToListAsync();
+
+        result.Should().BeTrue();
+
+        checkTriggers.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Description == "Replacement");
+    }
 }

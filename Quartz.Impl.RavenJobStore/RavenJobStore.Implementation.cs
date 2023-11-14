@@ -485,7 +485,7 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task<bool> ReplaceTriggerAsync(
+    internal async Task<bool> ReplaceTriggerAsync(
         TriggerKey triggerKey,
         IOperableTrigger newTrigger,
         CancellationToken token)
@@ -494,18 +494,26 @@ public partial class RavenJobStore
         
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        var exists = await session.Advanced
+        var triggerExists = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
 
-        if (exists == false)
+        if (triggerExists == false)
         {
             TraceExit(Logger, false);
             return false;
         }
         
-        session.Delete(triggerKey.GetDatabaseId());
-
+        var jobExists = await session.Advanced
+            .ExistsAsync(newTrigger.JobKey.GetDatabaseId(), token)
+            .ConfigureAwait(false);
+        
+        if (jobExists == false)
+        {
+            TraceExit(Logger, nameof(JobPersistenceException));
+            throw new JobPersistenceException($"The job ({newTrigger.JobKey}) referenced by the trigger does not exist.");
+        }
+        
         var triggerToStore = await CreateConfiguredTriggerAsync
         (
             newTrigger,
