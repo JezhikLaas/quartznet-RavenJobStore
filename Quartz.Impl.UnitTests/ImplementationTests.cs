@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Quartz.Impl.Calendar;
 using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Raven.Client.Documents;
@@ -966,5 +967,136 @@ public class ImplementationTests : TestBase
         checkTriggers.Should()
             .HaveCount(1).And
             .ContainSingle(x => x.Description == "Replacement");
+    }
+
+    [Fact(DisplayName = "If a trigger exists Then RetrieveTrigger returns it")]
+    public async Task If_a_trigger_exists_Then_RetrieveTrigger_returns_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RetrieveTriggerAsync(trigger.Key, CancellationToken.None);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "If a trigger exists Then RetrieveTrigger returns it in a certain state")]
+    public async Task If_a_trigger_exists_Then_RetrieveTrigger_returns_it_in_a_certain_state()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.RetrieveTriggerAsync(trigger.Key, CancellationToken.None);
+        result.ThrowIfNull();
+
+        result.Should().BeOfType<SimpleTriggerImpl>();
+        result.JobKey.Should().Be(trigger.JobKey);
+        result.Key.Should().Be(trigger.Key);
+    }
+
+    [Fact(DisplayName = "If a trigger does not exist Then RetrieveTrigger returns it")]
+    public async Task If_a_trigger_does_not_exist_Then_RetrieveTrigger_returns_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.RetrieveTriggerAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        result.Should().BeNull();
+    }
+
+    [Fact(DisplayName = "If a calendar exists Then CalendarExists returns true")]
+    public async Task If_a_calendar_exists_Then_CalendarExists_returns_true()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+        await Target.StoreCalendar("test", new BaseCalendar(), true, true);
+
+        var result = await Target.CalendarExistsAsync("test", CancellationToken.None);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "If a calendar does not exist Then CalendarExists returns false")]
+    public async Task If_a_calendar_does_not_exist_Then_CalendarExists_returns_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.CalendarExistsAsync("test", CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a job does not exist Then CheckExists returns false")]
+    public async Task If_a_job_does_not_exist_Then_CheckExists_returns_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.CheckExistsAsync(new JobKey("name", "group"), CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a job exists Then CheckExists returns true")]
+    public async Task If_a_job_exists_Then_CheckExists_returns_true()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.CheckExistsAsync(new JobKey("Job", "Group"), CancellationToken.None);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "If a trigger does not exist Then CheckExists returns false")]
+    public async Task If_a_trigger_does_not_exist_Then_CheckExists_returns_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.CheckExistsAsync(new TriggerKey("Trigger", "group"), CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a trigger exists Then CheckExists returns true")]
+    public async Task If_a_trigger_exists_Then_CheckExists_returns_true()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var result = await Target.CheckExistsAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+
+        result.Should().BeTrue();
     }
 }

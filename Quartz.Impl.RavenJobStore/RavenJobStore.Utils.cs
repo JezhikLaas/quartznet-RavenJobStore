@@ -232,7 +232,9 @@ public partial class RavenJobStore
             select trigger.Group
         ).ToListAsync(token).ConfigureAwait(false);
 
-    internal async Task<Trigger> CreateConfiguredTriggerAsync(IOperableTrigger newTrigger, CancellationToken token,
+    internal async Task<Trigger> CreateConfiguredTriggerAsync(
+        IOperableTrigger newTrigger,
+        CancellationToken token,
         IAsyncDocumentSession session)
     {
         var trigger = new Trigger(newTrigger, InstanceName);

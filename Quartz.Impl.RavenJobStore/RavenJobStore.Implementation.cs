@@ -533,44 +533,65 @@ public partial class RavenJobStore
         return true;
     }
 
-    private async Task<IOperableTrigger?> RetrieveTriggerAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task<IOperableTrigger?> RetrieveTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
 
-        return trigger?.Deserialize();
+        var result = trigger?.Deserialize();
+        
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task<bool> CalendarExistsAsync(string calName, CancellationToken token)
+    internal async Task<bool> CalendarExistsAsync(string calName, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        return scheduler?.Calendars is not null && scheduler.Calendars.ContainsKey(calName);
+        var result = scheduler?.Calendars is not null && scheduler.Calendars.ContainsKey(calName);
+        
+        TraceExit(Logger, result);
+        return result;
     }
 
-    private async Task<bool> CheckExistsAsync(JobKey jobKey, CancellationToken token)
+    internal async Task<bool> CheckExistsAsync(JobKey jobKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        return await session.Advanced
+        var result = await session.Advanced
             .ExistsAsync(jobKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
+        return result;
     }
 
-    private async Task<bool> CheckExistsAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task<bool> CheckExistsAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        return await session.Advanced
+        var result = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
+        return result;
     }
 
     private async Task ClearAllSchedulingDataAsync(CancellationToken token)
