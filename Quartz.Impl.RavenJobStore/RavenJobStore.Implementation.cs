@@ -594,8 +594,10 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task ClearAllSchedulingDataAsync(CancellationToken token)
+    internal async Task ClearAllSchedulingDataAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var triggerKeys = await (
@@ -622,15 +624,19 @@ public partial class RavenJobStore
         await session
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
+
+        TraceExit(Logger);
     }
 
-    private async Task StoreCalendarAsync(
+    internal async Task StoreCalendarAsync(
         string name,
         ICalendar calendar,
         bool replaceExisting,
         bool updateTriggers,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var calendarToStore = calendar.Clone();
@@ -666,10 +672,14 @@ public partial class RavenJobStore
         await session
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task<bool> RemoveCalendarAsync(string calendarName, CancellationToken token)
+    internal async Task<bool> RemoveCalendarAsync(string calendarName, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var scheduler = await session
@@ -681,6 +691,8 @@ public partial class RavenJobStore
         await session
             .SaveChangesAsync(token)
             .ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }

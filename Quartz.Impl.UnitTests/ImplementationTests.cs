@@ -1099,4 +1099,170 @@ public class ImplementationTests : TestBase
 
         result.Should().BeTrue();
     }
+
+    [Fact(DisplayName = "If a trigger exists Then ClearAllSchedulingData removes it")]
+    public async Task If_a_trigger_exists_Then_ClearAllSchedulingData_removes_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
+    
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.Query<Trigger>().ToListAsync();
+
+        checkTriggers.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If a job exists Then ClearAllSchedulingData removes it")]
+    public async Task If_a_job_exists_Then_ClearAllSchedulingData_removes_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group,
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
+    
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkJobs = await session.Query<Job>().ToListAsync();
+
+        checkJobs.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If a blocked jobs exists Then ClearAllSchedulingData removes it")]
+    public async Task If_a_blocked_job_exists_Then_ClearAllSchedulingData_removes_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            var scheduler = await arrangeSession.LoadAsync<Scheduler>(Target.InstanceName);
+            scheduler.BlockedJobs.Add("Test");
+
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
+    
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var check = await session.LoadAsync<Scheduler>(Target.InstanceName);
+
+        check.BlockedJobs.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "If a calendar exist Then ClearAllSchedulingData removes it")]
+    public async Task If_a_calendar_exist_Then_ClearAllSchedulingData_removes_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+        await Target.StoreCalendarAsync("test", new BaseCalendar(), true, true, CancellationToken.None);
+
+        await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
+
+        var exists = await Target.CalendarExistsAsync("Test", CancellationToken.None);
+
+        exists.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If a calendar exists and StoreCalendar tries to replace w/o flag Then it throws")]
+    public async Task If_a_calendar_exists_and_StoreCalendar_tries_to_replace_wo_flag_Then_it_throws()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+        await Target.StoreCalendarAsync("test", new BaseCalendar(), true, true, CancellationToken.None);
+        
+        var call = () => Target.StoreCalendar("test", new BaseCalendar(), false, true);
+        
+        await call.Should().ThrowAsync<ObjectAlreadyExistsException>();
+    }
+
+    [Fact(DisplayName = "If StoreCalendar updates triggers Then triggers are changed accordingly")]
+    public async Task If_StoreCalendar_updates_triggers_Then_triggers_are_changed_accordingly()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl
+        (
+            "Trigger",
+            "Group",
+            job.Name,
+            job.Group,
+            DateTimeOffset.UtcNow.AddMinutes(1),
+            null,
+            SimpleTriggerImpl.RepeatIndefinitely,
+            TimeSpan.FromMinutes(1)
+        )
+        {
+            CalendarName = "test"
+        };
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+
+        var calendarStart = trigger.StartTimeUtc.AddHours(1); 
+
+        var calendar = new DailyCalendar(calendarStart.Ticks, calendarStart.AddHours(1).Ticks);
+        await Target.StoreCalendarAsync("test", calendar, true, true, CancellationToken.None);
+
+        var checkTrigger = await Target.RetrieveTriggerAsync(trigger.Key, CancellationToken.None);
+        checkTrigger!.GetNextFireTimeUtc().Should().Be(calendarStart);
+    }
+
+    [Fact(DisplayName = "If RemoveCalendar names an existing entry Then the calendar is removed and true returned")]
+    public async Task If_RemoveCalendar_names_an_existing_entry_Then_the_calendar_is_removed_and_true_returned()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var calendarStart = DateTimeOffset.UtcNow;
+
+        var calendar = new DailyCalendar(calendarStart.Ticks, calendarStart.AddHours(1).Ticks);
+        await Target.StoreCalendarAsync("test", calendar, true, true, CancellationToken.None);
+
+        var result = await Target.RemoveCalendarAsync("test", CancellationToken.None);
+
+        result.Should().BeTrue();
+        (await Target.CalendarExistsAsync("test", CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If entry does not exist Then the RemoveCalendar returns false")]
+    public async Task If_entry_does_not_exist_Then_the_RemoveCalendar_returns_false()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.RemoveCalendarAsync("test", CancellationToken.None);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "If RemoveCalendar returns false Then other calendars are not affected")]
+    public async Task If_RemoveCalendar_returns_false_Then_other_calendars_are_not_affected()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var calendarStart = DateTimeOffset.UtcNow;
+
+        var calendar = new DailyCalendar(calendarStart.Ticks, calendarStart.AddHours(1).Ticks);
+        await Target.StoreCalendarAsync("test", calendar, true, true, CancellationToken.None);
+
+        var result = await Target.RemoveCalendarAsync("test1", CancellationToken.None);
+
+        result.Should().BeFalse();
+        (await Target.CalendarExistsAsync("test", CancellationToken.None)).Should().BeTrue();
+    }
 }
