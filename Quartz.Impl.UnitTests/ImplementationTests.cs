@@ -1265,4 +1265,100 @@ public class ImplementationTests : TestBase
         result.Should().BeFalse();
         (await Target.CalendarExistsAsync("test", CancellationToken.None)).Should().BeTrue();
     }
+
+    [Fact(DisplayName = "If a calendar exists Then RetrieveCalendar returns it")]
+    public async Task If_a_calendar_exists_Then_RetrieveCalendar_returns_it()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var calendarStart = DateTimeOffset.UtcNow;
+
+        var calendar = new DailyCalendar(calendarStart.Ticks, calendarStart.AddHours(1).Ticks);
+        await Target.StoreCalendarAsync("test", calendar, true, true, CancellationToken.None);
+
+        var result = await Target.RetrieveCalendarAsync("test", CancellationToken.None);
+
+        result.Should().BeOfType<DailyCalendar>();
+    }
+
+    [Fact(DisplayName = "If a calendar does not exist Then RetrieveCalendar returns null")]
+    public async Task If_a_calendar_does_not_exist_Then_RetrieveCalendar_returns_null()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var result = await Target.RetrieveCalendarAsync("test", CancellationToken.None);
+
+        result.Should().BeNull();
+    }
+
+    [Theory(DisplayName = "If GetNumberOfJobs is called Then it returns the number of existing jobs")]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task If_GetNumberOfJobs_is_called_Then_it_returns_the_number_of_existing_jobs(int count)
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        for (var index = 1; index <= count; ++index)
+        {
+            var job = new JobDetailImpl($"Job{index}", "Group", typeof(NoOpJob));
+            await Target.StoreJobAsync(job, false, CancellationToken.None);
+        }
+
+        var result = await Target.GetNumberOfJobsAsync(CancellationToken.None);
+
+        result.Should().Be(count);
+    }
+
+    [Theory(DisplayName = "If GetNumberOfTriggers is called Then it returns the number of existing triggers")]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task If_GetNumberOfTriggers_is_called_Then_it_returns_the_number_of_existing_triggers(int count)
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        for (var index = 1; index <= count; ++index)
+        {
+            var trigger = new SimpleTriggerImpl($"Trigger{index}", "Group")
+            {
+                JobName = job.Name,
+                JobGroup = job.Group,
+            };
+
+            await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        }
+
+        var result = await Target.GetNumberOfTriggersAsync(CancellationToken.None);
+
+        result.Should().Be(count);
+    }
+
+    [Theory(DisplayName = "If GetNumberOfCalendars is called Then it returns the number of existing calendars")]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task If_GetNumberOfCalendars_is_called_Then_it_returns_the_number_of_existing_calendars(int count)
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        for (var index = 1; index <= count; ++index)
+        {
+            await Target.StoreCalendarAsync
+            (
+                $"test{index}",
+                new BaseCalendar(),
+                true,
+                true,
+                CancellationToken.None
+            );
+        }
+
+        var result = await Target.GetNumberOfCalendarsAsync(CancellationToken.None);
+
+        result.Should().Be(count);
+    }
 }

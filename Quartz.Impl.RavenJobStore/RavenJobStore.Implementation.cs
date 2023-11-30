@@ -697,54 +697,82 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task<ICalendar?> RetrieveCalendarAsync(string calendarName, CancellationToken token)
+    internal async Task<ICalendar?> RetrieveCalendarAsync(string calendarName, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        if (scheduler.ThrowIfNull().Calendars.TryGetValue(calendarName, out var calendar)) return calendar;
+        if (scheduler.ThrowIfNull().Calendars.TryGetValue(calendarName, out var calendar))
+        {
+            TraceExit(Logger, calendar);
+            return calendar;
+        }
+
+        TraceExit(Logger, (ICalendar?)null);
 
         return null;
     }
 
-    private async Task<int> GetNumberOfJobsAsync(CancellationToken token)
+    internal async Task<int> GetNumberOfJobsAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        return await (
+        var result = await (
             from job in session.Query<Job>()
             select job
         ).CountAsync(token).ConfigureAwait(false);
+
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task<int> GetNumberOfTriggersAsync(CancellationToken token)
+    internal async Task<int> GetNumberOfTriggersAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        return await (
+        var result = await (
             from trigger in session.Query<Trigger>()
             select trigger
         ).CountAsync(token).ConfigureAwait(false);
+
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task<int> GetNumberOfCalendarsAsync(CancellationToken token)
+    internal async Task<int> GetNumberOfCalendarsAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        return scheduler.ThrowIfNull().Calendars.Count;
+        var result = scheduler.ThrowIfNull().Calendars.Count;
+
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task<IReadOnlyCollection<JobKey>> GetJobKeysAsync(
+    internal async Task<IReadOnlyCollection<JobKey>> GetJobKeysAsync(
         GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
         var jobKeys = await (
@@ -758,6 +786,8 @@ public partial class RavenJobStore
         {
             if (matcher.IsMatch(x)) result.Add(x);
         });
+
+        TraceExit(Logger, result);
 
         return result;
     }
