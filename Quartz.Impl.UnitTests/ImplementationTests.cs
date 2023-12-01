@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Quartz.Impl.Calendar;
+using Quartz.Impl.Matchers;
 using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Raven.Client.Documents;
@@ -1360,5 +1361,193 @@ public class ImplementationTests : TestBase
         var result = await Target.GetNumberOfCalendarsAsync(CancellationToken.None);
 
         result.Should().Be(count);
+    }
+
+    [Fact(DisplayName = "If a group matcher equals is used Then GetJobKeys finds entries")]
+    public async Task If_a_group_matcher_equals_is_used_Then_GetJobKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "Group3", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobKeysAsync
+        (
+            GroupMatcher<JobKey>.GroupEquals("Group2"), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Group == "Group2" && x.Name == "Job");
+    }
+
+    [Fact(DisplayName = "If a group matcher ends with is used Then GetJobKeys finds entries")]
+    public async Task If_a_group_matcher_ends_with_is_used_Then_GetJobKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "Group3", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobKeysAsync
+        (
+            GroupMatcher<JobKey>.GroupEndsWith("2"), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Group == "Group2" && x.Name == "Job");
+    }
+
+    [Fact(DisplayName = "If a group matcher starts with is used Then GetJobKeys finds entries")]
+    public async Task If_a_group_matcher_starts_with_is_used_Then_GetJobKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "1Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "2Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "3Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobKeysAsync
+        (
+            GroupMatcher<JobKey>.GroupStartsWith("2"), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Group == "2Group" && x.Name == "Job");
+    }
+
+    [Fact(DisplayName = "If a group matcher equals is used Then GetTriggerKeys finds entries")]
+    public async Task If_a_group_matcher_equals_is_used_Then_GetTriggerKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group1") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        job = new JobDetailImpl("Job", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group2") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        job = new JobDetailImpl("Job", "Group3", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group3") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        var result = await Target.GetTriggerKeysAsync
+        (
+            GroupMatcher<TriggerKey>.GroupEquals("Group2"), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(1).And
+            .ContainSingle(x => x.Group == "Group2" && x.Name == "Trigger");
+    }
+
+    [Fact(DisplayName = "If two job groups exist Then GetJobGroupNames lists them")]
+    public async Task If_two_job_groups_exist_Then_GetJobGroupNames_lists_them()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job1", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job2", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job3", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job4", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobGroupNamesAsync(CancellationToken.None);
+
+        result.Should()
+            .HaveCount(2).And
+            .ContainSingle(x => x == "Group1").And
+            .ContainSingle(x => x == "Group2");
+    }
+
+    [Fact(DisplayName = "If two trigger groups exist Then GetTriggerGroupNames lists them")]
+    public async Task If_two_trigger_groups_exist_Then_GetTriggerGroupNames_lists_them()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group1", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger1", "Group1") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        job = new JobDetailImpl("Job", "Group2", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger2", "Group1") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        job = new JobDetailImpl("Job", "Group3", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger3", "Group2") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        job = new JobDetailImpl("Job", "Group4", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger4", "Group2") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        var result = await Target.GetTriggerGroupNamesAsync(CancellationToken.None);
+        
+        result.Should()
+            .HaveCount(2).And
+            .ContainSingle(x => x == "Group1").And
+            .ContainSingle(x => x == "Group2");
     }
 }

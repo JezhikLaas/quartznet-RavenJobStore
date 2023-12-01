@@ -5,6 +5,7 @@ using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
+using Raven.Client.Documents.Session;
 
 // ReSharper disable MemberCanBePrivate.Global
 // Internal instead of private for unit tests.
@@ -39,20 +40,16 @@ public partial class RavenJobStore
                 : new X509Certificate2(CertificatePath, CertificatePath)
         };
 
-        store.OnBeforeQuery += (_, beforeQueryExecutedArgs) =>
-        {
-            beforeQueryExecutedArgs.QueryCustomization.WaitForNonStaleResults();
-        };
         store.Initialize();
 
         return store;
     }
-
+    
     internal async Task SchedulerStartedAsync(CancellationToken token)
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var exists = await session.Advanced.ExistsAsync(InstanceName, token);
 
@@ -86,7 +83,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, cancellationToken)
             .ConfigureAwait(false);
@@ -105,7 +102,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
         var jobToStore = new Job(newJob, InstanceName);
 
         var triggerToStore = await CreateConfiguredTriggerAsync
@@ -134,7 +131,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -151,7 +148,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
         var result =  await IsTriggerGroupPausedAsync(session, groupName, token).ConfigureAwait(false);
         
         TraceExit(Logger, result);
@@ -163,7 +160,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         if (await session.Advanced.ExistsAsync(newJob.Key.GetDatabaseId(), token).ConfigureAwait(false))
         {
@@ -189,7 +186,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         if (replace == false)
         {
@@ -218,7 +215,7 @@ public partial class RavenJobStore
             }
         }
         
-        await using var bulkInsert = DocumentStore.BulkInsert(token: token);
+        await using var bulkInsert = DocumentStore.ThrowIfNull().BulkInsert(token: token);
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -267,7 +264,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var jobExists = await session.Advanced
             .ExistsAsync(jobKey.GetDatabaseId(), token)
@@ -293,7 +290,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         foreach (var jobKey in jobKeys)
         {
@@ -313,7 +310,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var job = await session
             .LoadAsync<Job>(jobKey.GetDatabaseId(), token)
@@ -333,7 +330,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggerExists = await session.Advanced
             .ExistsAsync(newTrigger.Key.GetDatabaseId(), token)
@@ -372,7 +369,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggerExists = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
@@ -422,7 +419,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await session
             .Include<Trigger>(x => x.JobKey)
@@ -492,7 +489,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggerExists = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
@@ -537,7 +534,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
@@ -554,7 +551,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -570,7 +567,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = await session.Advanced
             .ExistsAsync(jobKey.GetDatabaseId(), token)
@@ -584,7 +581,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = await session.Advanced
             .ExistsAsync(triggerKey.GetDatabaseId(), token)
@@ -598,7 +595,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggerKeys = await (
             from trigger in session.Query<Trigger>()
@@ -637,7 +634,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var calendarToStore = calendar.Clone();
         var scheduler = await session
@@ -680,7 +677,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -701,7 +698,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -722,7 +719,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = await (
             from job in session.Query<Job>()
@@ -738,7 +735,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = await (
             from trigger in session.Query<Trigger>()
@@ -754,7 +751,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -769,77 +766,97 @@ public partial class RavenJobStore
 
     internal async Task<IReadOnlyCollection<JobKey>> GetJobKeysAsync(
         GroupMatcher<JobKey> matcher,
-        CancellationToken token)
+            CancellationToken token)
     {
         TraceEnter(Logger);
-        
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
 
-        var jobKeys = await (
-            from job in session.Query<Job>()
-            select job.JobKey
-        ).ToListAsync(token).ConfigureAwait(false);
+        using var session = GetNonWaitingSession();
+        
+        var query = session.Query<Job>().ProjectInto<JobKey>();
+
+        await using var stream = await session
+            .Advanced
+            .StreamAsync(query, token)
+            .ConfigureAwait(false);
 
         var result = new HashSet<JobKey>();
 
-        jobKeys.ForEach(x =>
+        while (await stream.MoveNextAsync().ConfigureAwait(false))
         {
-            if (matcher.IsMatch(x)) result.Add(x);
-        });
+            if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+        }
 
         TraceExit(Logger, result);
 
         return result;
     }
 
-    private async Task<IReadOnlyCollection<TriggerKey>> GetTriggerKeysAsync(
+    internal async Task<IReadOnlyCollection<TriggerKey>> GetTriggerKeysAsync(
         GroupMatcher<TriggerKey> matcher,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        TraceEnter(Logger);
 
-        var triggerKeys = await (
-            from trigger in session.Query<Trigger>()
-            select trigger.TriggerKey
-        ).ToListAsync(token).ConfigureAwait(false);
+        using var session = GetNonWaitingSession();
+        
+        var query = session.Query<Trigger>().ProjectInto<TriggerKey>();
+
+        await using var stream = await session
+            .Advanced
+            .StreamAsync(query, token)
+            .ConfigureAwait(false);
 
         var result = new HashSet<TriggerKey>();
 
-        triggerKeys.ForEach(x =>
+        while (await stream.MoveNextAsync().ConfigureAwait(false))
         {
-            if (matcher.IsMatch(x)) result.Add(x);
-        });
+            if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+        }
+
+        TraceExit(Logger, result);
 
         return result;
     }
 
-    private async Task<IReadOnlyCollection<string>> GetJobGroupNamesAsync(CancellationToken token)
+    internal async Task<IReadOnlyCollection<string>> GetJobGroupNamesAsync(CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        TraceEnter(Logger);
 
-        return await (
+        using var session = GetSession();
+
+        var result = await (
             from job in session.Query<Job>()
             group job by job.Group
             into jobGroups
-            select jobGroups.Key
+            select new { Group = jobGroups.Key }
         ).ToListAsync(token).ConfigureAwait(false);
+
+        TraceExit(Logger, result);
+
+        return result.Select(x => x.Group).ToList();
     }
 
-    private async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(CancellationToken token)
+    internal async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        TraceEnter(Logger);
 
-        return await (
+        using var session = GetSession();
+
+        var result = await (
             from trigger in session.Query<Trigger>()
             group trigger by trigger.Group
             into triggerGroups
-            select triggerGroups.Key
+            select new { Group = triggerGroups.Key }
         ).ToListAsync(token).ConfigureAwait(false);
+
+        TraceExit(Logger, result);
+
+        return result.Select(x => x.Group).ToList();
     }
 
     private async Task<IReadOnlyCollection<string>> GetCalendarNamesAsync(CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
@@ -852,7 +869,7 @@ public partial class RavenJobStore
         JobKey jobKey,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await (
             from trigger in session.Query<Trigger>()
@@ -865,7 +882,7 @@ public partial class RavenJobStore
 
     private async Task<TriggerState> GetTriggerStateAsync(TriggerKey triggerKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
@@ -886,7 +903,7 @@ public partial class RavenJobStore
 
     private async Task ResetTriggerFromErrorStateAsync(TriggerKey triggerKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
@@ -924,7 +941,7 @@ public partial class RavenJobStore
 
     private async Task PauseTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
@@ -943,7 +960,7 @@ public partial class RavenJobStore
         GroupMatcher<TriggerKey> matcher,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await (
             from trigger in session.Query<Trigger>()
@@ -970,7 +987,7 @@ public partial class RavenJobStore
 
     private async Task PauseJobAsync(JobKey jobKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await GetTriggersForJobKeysAsync
         (
@@ -993,7 +1010,7 @@ public partial class RavenJobStore
         GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var jobKeys = await (
             from job in session.Query<Job>()
@@ -1032,7 +1049,7 @@ public partial class RavenJobStore
 
     private async Task ResumeTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var trigger = await session
             .Include<Trigger>(x => x.Scheduler) // preload
@@ -1059,7 +1076,7 @@ public partial class RavenJobStore
         GroupMatcher<TriggerKey> matcher,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await (
             from trigger in session.Query<Trigger>()
@@ -1094,14 +1111,14 @@ public partial class RavenJobStore
 
     private async Task<IReadOnlyList<string>> GetPausedTriggerGroupsAsync(CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         return await GetPausedTriggerGroupsAsync(session, token).ConfigureAwait(false);
     }
 
     private async Task ResumeJobAsync(JobKey jobKey, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await GetTriggersForJobKeysAsync
         (
@@ -1130,7 +1147,7 @@ public partial class RavenJobStore
 
     private async Task ResumeAllTriggersAsync(CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var triggers = await (
             from trigger in session.Query<Trigger>()
@@ -1162,7 +1179,7 @@ public partial class RavenJobStore
         GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var jobKeys = await (
             from job in session.Query<Job>()
@@ -1214,7 +1231,7 @@ public partial class RavenJobStore
         TimeSpan timeWindow,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = new List<IOperableTrigger>();
         var acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
@@ -1279,7 +1296,7 @@ public partial class RavenJobStore
 
     private async Task ReleaseAcquiredTriggerAsync(IOperableTrigger trigger, CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var storedTrigger = await session
             .LoadAsync<Trigger>(trigger.Key.GetDatabaseId(), token)
@@ -1301,7 +1318,7 @@ public partial class RavenJobStore
         IReadOnlyCollection<IOperableTrigger> triggers,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var result = new List<TriggerFiredResult>();
 
@@ -1393,7 +1410,7 @@ public partial class RavenJobStore
         SchedulerInstruction triggerInstCode,
         CancellationToken token)
     {
-        using var session = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        using var session = GetSession();
 
         var entry = await session
             .Include<Trigger>(x => x.Scheduler)

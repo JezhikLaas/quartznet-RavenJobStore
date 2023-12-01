@@ -19,12 +19,4 @@ public class TestBase : RavenTestDriver
         var result = GetDocumentStore();
         return result;
     }
-
-    protected override void PreInitialize(IDocumentStore documentStore)
-    {
-        documentStore.OnBeforeQuery += (_, beforeQueryExecutedArgs) =>
-        {
-            beforeQueryExecutedArgs.QueryCustomization.WaitForNonStaleResults();
-        };
-    }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,30 @@ namespace Quartz.Impl.RavenJobStore;
 
 public partial class RavenJobStore
 {
+    private IAsyncDocumentSession GetNonWaitingSession() =>
+        DocumentStore.ThrowIfNull().OpenAsyncSession();
+    
+    private IAsyncDocumentSession GetSession()
+    {
+        var result = DocumentStore.ThrowIfNull().OpenAsyncSession();
+        result.Advanced.OnBeforeQuery += AdvancedOnBeforeQuery;
+        result.Advanced.OnSessionDisposing += AdvancedOnSessionDisposing;
+
+        return result;
+    }
+
+    private void AdvancedOnSessionDisposing(object? sender, SessionDisposingEventArgs e)
+    {
+        if (e.Session is IAsyncDocumentSession session)
+        {
+            session.Advanced.OnBeforeQuery -= AdvancedOnBeforeQuery;
+            session.Advanced.OnSessionDisposing -= AdvancedOnSessionDisposing;
+        }
+    }
+
+    private void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e) => 
+        e.QueryCustomization.WaitForNonStaleResults();
+
     private async Task RestartTriggersForRecoveringJobsAsync(IAsyncDocumentSession session, CancellationToken token)
     {
         var recoveringJobKeys = await (
@@ -351,5 +376,31 @@ public static class SortedSetExtensions
         }
 
         return result;
+    }
+}
+
+public class NonWaitingSession : IDisposable
+{
+    private ConcurrentDictionary<int, IAsyncDocumentSession> Ignored { get; }
+
+    public IAsyncDocumentSession Session { get; }
+
+    public NonWaitingSession(
+        ConcurrentDictionary<int, IAsyncDocumentSession> ignored,
+        IAsyncDocumentSession session)
+    {
+        Session = session;
+        Ignored = ignored;
+
+        if (Ignored.TryAdd(session.Advanced.SessionInfo.SessionId, session) == false)
+        {
+            throw new InvalidOperationException("Unable to add session to ignore list");
+        }
+    }
+
+    public void Dispose()
+    {
+        Ignored.Remove(Session.Advanced.SessionInfo.SessionId, out _);
+        Session.Dispose();
     }
 }
