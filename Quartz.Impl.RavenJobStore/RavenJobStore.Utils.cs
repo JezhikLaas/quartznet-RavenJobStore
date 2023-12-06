@@ -232,30 +232,33 @@ public partial class RavenJobStore
     private async Task<bool> IsTriggerGroupPausedAsync(
         IAsyncDocumentSession session,
         string groupName,
-        CancellationToken token) =>
-        await (
-            from trigger in session.Query<Trigger>()
-                .Include(x => x.Scheduler)
-            where trigger.Group == groupName
-                  &&
-                  (
-                      trigger.State == InternalTriggerState.Paused
-                      ||
-                      trigger.State == InternalTriggerState.PausedAndBlocked
-                  )
-            select trigger
-        ).AnyAsync(token).ConfigureAwait(false);
+        CancellationToken token)
+    {
+        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
+        return scheduler.ThrowIfNull().PausedTriggerGroups.Contains(groupName);
+    }
 
     private async Task<IReadOnlyList<string>> GetPausedTriggerGroupsAsync(
         IAsyncDocumentSession session,
-        CancellationToken token) =>
-        await (
+        CancellationToken token)
+    {
+        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
+        return scheduler.ThrowIfNull().PausedTriggerGroups.ToList();
+    }
+
+    private async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
+        IAsyncDocumentSession session,
+        CancellationToken token)
+    {
+        var result = await (
             from trigger in session.Query<Trigger>()
-            where trigger.State == InternalTriggerState.Paused
-                  ||
-                  trigger.State == InternalTriggerState.PausedAndBlocked
-            select trigger.Group
+            group trigger by trigger.Group
+            into triggerGroups
+            select new { Group = triggerGroups.Key }
         ).ToListAsync(token).ConfigureAwait(false);
+
+        return result.Select(x => x.Group).ToList();
+    }
 
     internal async Task<Trigger> CreateConfiguredTriggerAsync(
         IOperableTrigger newTrigger,

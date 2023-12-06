@@ -5,7 +5,6 @@ using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
-using Raven.Client.Documents.Session;
 
 // ReSharper disable MemberCanBePrivate.Global
 // Internal instead of private for unit tests.
@@ -613,6 +612,7 @@ public partial class RavenJobStore
         
         scheduler.BlockedJobs.Clear();
         scheduler.PausedJobGroups.Clear();
+        scheduler.PausedTriggerGroups.Clear();
         scheduler.Calendars.Clear();
         
         triggerKeys.ForEach(x => session.Delete(x));
@@ -842,33 +842,36 @@ public partial class RavenJobStore
 
         using var session = GetSession();
 
-        var result = await (
-            from trigger in session.Query<Trigger>()
-            group trigger by trigger.Group
-            into triggerGroups
-            select new { Group = triggerGroups.Key }
-        ).ToListAsync(token).ConfigureAwait(false);
+        var result = await GetTriggerGroupNamesAsync(session, token).ConfigureAwait(false);
 
         TraceExit(Logger, result);
 
-        return result.Select(x => x.Group).ToList();
+        return result;
     }
 
-    private async Task<IReadOnlyCollection<string>> GetCalendarNamesAsync(CancellationToken token)
+    internal async Task<IReadOnlyCollection<string>> GetCalendarNamesAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = GetSession();
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        return scheduler.ThrowIfNull().Calendars.Keys;
+        var result = scheduler.ThrowIfNull().Calendars.Keys;
+
+        TraceExit(Logger, result);
+
+        return result;
     }
     
-    private async Task<IReadOnlyCollection<IOperableTrigger>> GetTriggersForJobAsync(
+    internal async Task<IReadOnlyCollection<IOperableTrigger>> GetTriggersForJobAsync(
         JobKey jobKey,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = GetSession();
 
         var triggers = await (
@@ -877,11 +880,17 @@ public partial class RavenJobStore
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-        return triggers.Select(x => x.Deserialize()).ToList();
+        var result = triggers.Select(x => x.Deserialize()).ToList();
+
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task<TriggerState> GetTriggerStateAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task<TriggerState> GetTriggerStateAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = GetSession();
 
         var trigger = await session
@@ -890,7 +899,7 @@ public partial class RavenJobStore
 
         if (trigger == null) return TriggerState.None;
 
-        return trigger.State switch
+        var result = trigger.State switch
         {
             InternalTriggerState.Complete => TriggerState.Complete,
             InternalTriggerState.Blocked => TriggerState.Blocked,
@@ -899,17 +908,27 @@ public partial class RavenJobStore
             InternalTriggerState.Error => TriggerState.Error,
             _ => TriggerState.Normal
         };
+
+        TraceExit(Logger, result);
+
+        return result;
     }
 
-    private async Task ResetTriggerFromErrorStateAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task ResetTriggerFromErrorStateAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+
         using var session = GetSession();
 
         var trigger = await session
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(), token)
             .ConfigureAwait(false);
 
-        if (trigger is not { State: InternalTriggerState.Error }) return;
+        if (trigger is not { State: InternalTriggerState.Error })
+        {
+            TraceExit(Logger);
+            return;
+        }
 
         var isTriggerGroupPaused = await IsTriggerGroupPausedAsync
         (
@@ -935,12 +954,20 @@ public partial class RavenJobStore
         {
             trigger.State = InternalTriggerState.Blocked;
         }
+        else
+        {
+            trigger.State = InternalTriggerState.Waiting;
+        }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task PauseTriggerAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task PauseTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var trigger = await session
@@ -954,33 +981,56 @@ public partial class RavenJobStore
             : InternalTriggerState.Paused;
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task<IReadOnlyCollection<string>> PauseTriggersAsync(
+    internal async Task<IReadOnlyCollection<string>> PauseTriggersAsync(
         GroupMatcher<TriggerKey> matcher,
         CancellationToken token)
     {
-        using var session = GetSession();
+        TraceEnter(Logger);
 
-        var triggers = await (
-            from trigger in session.Query<Trigger>()
-            select trigger
-        ).ToListAsync(token).ConfigureAwait(false);
+        using var session = GetNonWaitingSession();
+        using var updateSession = GetSession();
+        
+        var scheduler = await updateSession.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
+
+        var query = session.Query<Trigger>();
+
+        await using var stream = await session
+            .Advanced
+            .StreamAsync(query, token)
+            .ConfigureAwait(false);
 
         var result = new HashSet<string>();
 
-        foreach (var trigger in triggers)
+        while (await stream.MoveNextAsync().ConfigureAwait(false))
         {
-            if (matcher.IsMatch(trigger.TriggerKey) == false) continue;
-        
-            trigger.State = trigger.State == InternalTriggerState.Blocked
-                ? InternalTriggerState.PausedAndBlocked
-                : InternalTriggerState.Paused;
+            if (matcher.IsMatch(stream.Current.Document.TriggerKey))
+            {
+                result.Add(stream.Current.Document.Group);
+                scheduler.PausedTriggerGroups.Add(stream.Current.Document.Group);
 
-            result.Add(trigger.TriggerKey.Group);
+                if (stream.Current.Document.State == InternalTriggerState.Complete) continue;
+
+                stream.Current.Document.State = stream.Current.Document.State == InternalTriggerState.Blocked
+                    ? InternalTriggerState.PausedAndBlocked 
+                    : InternalTriggerState.Paused;
+
+                await updateSession.StoreAsync
+                (
+                    stream.Current.Document,
+                    stream.Current.ChangeVector,
+                    stream.Current.Id,
+                    token
+                ).ConfigureAwait(false);
+            }
         }
 
-        await session.SaveChangesAsync(token).ConfigureAwait(false);
+        await updateSession.SaveChangesAsync(token).ConfigureAwait(false);
+
+        TraceExit(Logger, result);
 
         return result;
     }

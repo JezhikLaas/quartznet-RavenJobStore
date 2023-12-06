@@ -23,5 +23,7 @@ public class Scheduler
 
     public HashSet<string> PausedJobGroups { get; set; } = new();
 
+    public HashSet<string> PausedTriggerGroups { get; set; } = new();
+
     public HashSet<string> BlockedJobs { get; set; } = new();
 }
