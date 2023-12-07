@@ -2360,4 +2360,42 @@ public class ImplementationTests : TestBase
             .HaveCount(1).And
             .ContainSingle(x => x.Description == "Expected");
     }
+
+    [Fact(DisplayName = "If a trigger is acquired Then its state reflects this")]
+    public async Task If_a_trigger_is_acquired_Then_its_state_reflects_this()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+
+        await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var trigger = await session.LoadAsync<Trigger>("Trigger/Group");
+
+        trigger.State.Should().Be(InternalTriggerState.Acquired);
+    }
 }

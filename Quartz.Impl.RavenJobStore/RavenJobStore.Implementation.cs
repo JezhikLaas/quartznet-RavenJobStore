@@ -1406,6 +1406,8 @@ public partial class RavenJobStore
 
             result.Add(trigger.Deserialize());
         }
+
+        await session.SaveChangesAsync(token).ConfigureAwait(false);
         
         TraceExit(Logger, result);
 
