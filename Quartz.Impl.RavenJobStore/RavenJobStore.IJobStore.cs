@@ -19,181 +19,154 @@ public partial class RavenJobStore : IJobStore
     }
 
     /// <inheritdoc />
-    public async Task SchedulerStarted(CancellationToken cancellationToken = new()) => 
-        await SchedulerStartedAsync(cancellationToken).ConfigureAwait(false);
+    public Task SchedulerStarted(CancellationToken cancellationToken = new()) => 
+        SchedulerStartedAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task SchedulerPaused(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task SchedulerPaused(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             SetSchedulerStateAsync(SchedulerState.Paused, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task SchedulerResumed(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task SchedulerResumed(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             SetSchedulerStateAsync(SchedulerState.Resumed, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task Shutdown(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task Shutdown(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             SetSchedulerStateAsync(SchedulerState.Shutdown, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task StoreJobAndTrigger(
+    public Task StoreJobAndTrigger(
         IJobDetail newJob,
         IOperableTrigger newTrigger,
-        CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             StoreJobAndTriggerAsync(newJob, newTrigger, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> IsJobGroupPaused(string groupName, CancellationToken cancellationToken = new()) => 
-        await IsJobGroupPausedAsync(groupName, cancellationToken).ConfigureAwait(false);
+    public Task<bool> IsJobGroupPaused(string groupName, CancellationToken cancellationToken = new()) => 
+        IsJobGroupPausedAsync(groupName, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<bool> IsTriggerGroupPaused(string groupName, CancellationToken cancellationToken = new()) => 
-        await IsTriggerGroupPausedAsync(groupName, cancellationToken).ConfigureAwait(false);
+    public Task<bool> IsTriggerGroupPaused(string groupName, CancellationToken cancellationToken = new()) => 
+        IsTriggerGroupPausedAsync(groupName, cancellationToken);
 
     /// <inheritdoc />
-    public async Task StoreJob(IJobDetail newJob, bool replaceExisting, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task StoreJob(IJobDetail newJob, bool replaceExisting, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             StoreJobAsync(newJob, replaceExisting, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task StoreJobsAndTriggers(
+    public Task StoreJobsAndTriggers(
         IReadOnlyDictionary<IJobDetail, IReadOnlyCollection<ITrigger>> triggersAndJobs,
         bool replace,
-        CancellationToken cancellationToken = new())
-    {
-        await StoreJobsAndTriggersAsync
+        CancellationToken cancellationToken = new()) =>
+        StoreJobsAndTriggersAsync
         (
             triggersAndJobs,
             replace,
             cancellationToken
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> RemoveJob(JobKey jobKey, CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+    public Task<bool> RemoveJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RemoveJobAsync(jobKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> RemoveJobs(IReadOnlyCollection<JobKey> jobKeys, CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+    public Task<bool> RemoveJobs(IReadOnlyCollection<JobKey> jobKeys, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RemoveJobsAsync(jobKeys, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IJobDetail?> RetrieveJob(JobKey jobKey, CancellationToken cancellationToken = new()) => 
-        await RetrieveJobAsync(jobKey, cancellationToken).ConfigureAwait(false);
+    public Task<IJobDetail?> RetrieveJob(JobKey jobKey, CancellationToken cancellationToken = new()) => 
+        RetrieveJobAsync(jobKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task StoreTrigger(
+    public Task StoreTrigger(
         IOperableTrigger newTrigger,
         bool replaceExisting,
-        CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             StoreTriggerAsync(newTrigger, replaceExisting, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> RemoveTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+    public Task<bool> RemoveTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RemoveTriggerAsync(triggerKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> RemoveTriggers(
+    public Task<bool> RemoveTriggers(
         IReadOnlyCollection<TriggerKey> triggerKeys,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RemoveTriggersAsync(triggerKeys, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> ReplaceTrigger(
+    public Task<bool> ReplaceTrigger(
         TriggerKey triggerKey,
         IOperableTrigger newTrigger,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ReplaceTriggerAsync(triggerKey, newTrigger, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IOperableTrigger?> RetrieveTrigger(
+    public Task<IOperableTrigger?> RetrieveTrigger(
         TriggerKey triggerKey,
         CancellationToken cancellationToken = new()) =>
-        await RetrieveTriggerAsync(triggerKey, cancellationToken).ConfigureAwait(false);
+        RetrieveTriggerAsync(triggerKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<bool> CalendarExists(string calName, CancellationToken cancellationToken = new()) => 
-        await CalendarExistsAsync(calName, cancellationToken).ConfigureAwait(false);
+    public Task<bool> CalendarExists(string calName, CancellationToken cancellationToken = new()) => 
+        CalendarExistsAsync(calName, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<bool> CheckExists(JobKey jobKey, CancellationToken cancellationToken = new()) => 
-        await CheckExistsAsync(jobKey, cancellationToken).ConfigureAwait(false);
+    public Task<bool> CheckExists(JobKey jobKey, CancellationToken cancellationToken = new()) => 
+        CheckExistsAsync(jobKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<bool> CheckExists(TriggerKey triggerKey, CancellationToken cancellationToken = new()) => 
-        await CheckExistsAsync(triggerKey, cancellationToken).ConfigureAwait(false);
+    public Task<bool> CheckExists(TriggerKey triggerKey, CancellationToken cancellationToken = new()) => 
+        CheckExistsAsync(triggerKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task ClearAllSchedulingData(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ClearAllSchedulingData(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ClearAllSchedulingDataAsync(cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task StoreCalendar(
+    public Task StoreCalendar(
         string name, 
         ICalendar calendar,
         bool replaceExisting,
         bool updateTriggers,
-        CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             StoreCalendarAsync
             (
@@ -203,143 +176,124 @@ public partial class RavenJobStore : IJobStore
                 updateTriggers,
                 cancellationToken
             )
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<bool> RemoveCalendar(string calName, CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+    public Task<bool> RemoveCalendar(string calName, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RemoveCalendarAsync(calName, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<ICalendar?> RetrieveCalendar(string calName, CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+    public Task<ICalendar?> RetrieveCalendar(string calName, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             RetrieveCalendarAsync(calName, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<int> GetNumberOfJobs(CancellationToken cancellationToken = new()) => 
-        await GetNumberOfJobsAsync(cancellationToken).ConfigureAwait(false);
+    public Task<int> GetNumberOfJobs(CancellationToken cancellationToken = new()) => 
+        GetNumberOfJobsAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<int> GetNumberOfTriggers(CancellationToken cancellationToken = new()) => 
-        await GetNumberOfTriggersAsync(cancellationToken).ConfigureAwait(false);
+    public Task<int> GetNumberOfTriggers(CancellationToken cancellationToken = new()) => 
+        GetNumberOfTriggersAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<int> GetNumberOfCalendars(CancellationToken cancellationToken = new()) => 
-        await GetNumberOfCalendarsAsync(cancellationToken).ConfigureAwait(false);
+    public Task<int> GetNumberOfCalendars(CancellationToken cancellationToken = new()) => 
+        GetNumberOfCalendarsAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<JobKey>> GetJobKeys(
+    public Task<IReadOnlyCollection<JobKey>> GetJobKeys(
         GroupMatcher<JobKey> matcher,
         CancellationToken cancellationToken = new()) =>
-        await GetJobKeysAsync(matcher, cancellationToken).ConfigureAwait(false);
+        GetJobKeysAsync(matcher, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<TriggerKey>> GetTriggerKeys(
+    public Task<IReadOnlyCollection<TriggerKey>> GetTriggerKeys(
         GroupMatcher<TriggerKey> matcher,
         CancellationToken cancellationToken = new()) =>
-        await GetTriggerKeysAsync(matcher, cancellationToken).ConfigureAwait(false);
+        GetTriggerKeysAsync(matcher, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> GetJobGroupNames(CancellationToken cancellationToken = new()) => 
-        await GetJobGroupNamesAsync(cancellationToken).ConfigureAwait(false);
+    public Task<IReadOnlyCollection<string>> GetJobGroupNames(CancellationToken cancellationToken = new()) => 
+        GetJobGroupNamesAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> GetTriggerGroupNames(CancellationToken cancellationToken = new()) => 
-        await GetTriggerGroupNamesAsync(cancellationToken).ConfigureAwait(false);
+    public Task<IReadOnlyCollection<string>> GetTriggerGroupNames(CancellationToken cancellationToken = new()) => 
+        GetTriggerGroupNamesAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> GetCalendarNames(CancellationToken cancellationToken = new()) => 
-        await GetCalendarNamesAsync(cancellationToken).ConfigureAwait(false);
+    public Task<IReadOnlyCollection<string>> GetCalendarNames(CancellationToken cancellationToken = new()) => 
+        GetCalendarNamesAsync(cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<IOperableTrigger>> GetTriggersForJob(
+    public Task<IReadOnlyCollection<IOperableTrigger>> GetTriggersForJob(
         JobKey jobKey,
         CancellationToken cancellationToken = new()) =>
-        await GetTriggersForJobAsync(jobKey, cancellationToken).ConfigureAwait(false);
+        GetTriggersForJobAsync(jobKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<TriggerState> GetTriggerState(
+    public Task<TriggerState> GetTriggerState(
         TriggerKey triggerKey,
         CancellationToken cancellationToken = new()) =>
-        await GetTriggerStateAsync(triggerKey, cancellationToken).ConfigureAwait(false);
+        GetTriggerStateAsync(triggerKey, cancellationToken);
 
     /// <inheritdoc />
-    public async Task ResetTriggerFromErrorState(TriggerKey triggerKey, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ResetTriggerFromErrorState(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResetTriggerFromErrorStateAsync(triggerKey,cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task PauseTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task PauseTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             PauseTriggerAsync(triggerKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> PauseTriggers(
+    public Task<IReadOnlyCollection<string>> PauseTriggers(
         GroupMatcher<TriggerKey> matcher,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             PauseTriggersAsync(matcher, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task PauseJob(JobKey jobKey, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task PauseJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             PauseJobAsync(jobKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> PauseJobs(
+    public Task<IReadOnlyCollection<string>> PauseJobs(
         GroupMatcher<JobKey> matcher,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             PauseJobsAsync(matcher, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task ResumeTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ResumeTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResumeTriggerAsync(triggerKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> ResumeTriggers(
+    public Task<IReadOnlyCollection<string>> ResumeTriggers(
         GroupMatcher<TriggerKey> matcher,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResumeTriggersAsync(matcher, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
     public async Task<IReadOnlyCollection<string>> GetPausedTriggerGroups(
@@ -347,24 +301,20 @@ public partial class RavenJobStore : IJobStore
         await GetPausedTriggerGroupsAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task ResumeJob(JobKey jobKey, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ResumeJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResumeJobAsync(jobKey, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<string>> ResumeJobs(
+    public Task<IReadOnlyCollection<string>> ResumeJobs(
         GroupMatcher<JobKey> matcher,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResumeJobsAsync(matcher, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
     public async Task PauseAll(CancellationToken cancellationToken = new())
@@ -376,22 +326,19 @@ public partial class RavenJobStore : IJobStore
     }
 
     /// <inheritdoc />
-    public async Task ResumeAll(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ResumeAll(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ResumeAllTriggersAsync(cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<IOperableTrigger>> AcquireNextTriggers(
+    public Task<IReadOnlyCollection<IOperableTrigger>> AcquireNextTriggers(
         DateTimeOffset noLaterThan,
         int maxCount,
         TimeSpan timeWindow,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             AcquireNextTriggersAsync
             (
@@ -400,37 +347,31 @@ public partial class RavenJobStore : IJobStore
                 timeWindow,
                 cancellationToken
             )
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task ReleaseAcquiredTrigger(IOperableTrigger trigger, CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task ReleaseAcquiredTrigger(IOperableTrigger trigger, CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             ReleaseAcquiredTriggerAsync(trigger, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFired(
+    public Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFired(
         IReadOnlyCollection<IOperableTrigger> triggers,
-        CancellationToken cancellationToken = new())
-    {
-        return await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             TriggersFiredAsync(triggers, cancellationToken)
-        ).ConfigureAwait(false);
-    }
+        );
 
     /// <inheritdoc />
-    public async Task TriggeredJobComplete(
+    public Task TriggeredJobComplete(
         IOperableTrigger trigger,
         IJobDetail jobDetail,
         SchedulerInstruction triggerInstCode,
-        CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
             TriggeredJobCompleteAsync
             (
@@ -439,6 +380,5 @@ public partial class RavenJobStore : IJobStore
                 triggerInstCode,
                 cancellationToken
             )
-        ).ConfigureAwait(false);
-    }
+        );
 }

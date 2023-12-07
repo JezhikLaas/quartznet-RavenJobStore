@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json;
 using Quartz.Spi;
 using Raven.Client.Documents;
+using JsonSerializer = System.Text.Json.JsonSerializer;
+
 // ReSharper disable MemberCanBePrivate.Global
 
 namespace Quartz.Impl.RavenJobStore;
@@ -21,17 +23,20 @@ public partial class RavenJobStore
     /// <summary>
     ///     The database to use for this <see cref="RavenJobStore" /> instance.
     /// </summary>
+    [JsonProperty]
     public string? Database { get; set; }
 
     /// <summary>
     /// Only here to satisfy the object creation. We always attempt to (de-)serialize any
     /// value type in the Job Data Map anyway, not just strings.
     /// </summary>
+    [JsonProperty]
     public bool UseProperties { get; set; }
 
     /// <summary>
     /// Gets the URL(s) to the database server(s).
     /// </summary>
+    [JsonProperty]
     public string Urls
     {
         get => RavenNodes != null
@@ -43,19 +48,23 @@ public partial class RavenJobStore
     /// <summary>
     /// Gets the path to the certificate to authenticate against the database.
     /// </summary>
+    [JsonProperty]
     public string? CertificatePath { get; set; }
 
     /// <summary>
     /// Gets the password to the certificate to authenticate against the database.
     /// </summary>
+    [JsonProperty]
     public string? CertificatePassword { get; set; }
 
     /// <summary>
     /// Gets the current configured <see cref="IDocumentStore" />.
     /// </summary>
+    [JsonProperty]
     internal IDocumentStore? DocumentStore { get; set; }
 
-    protected DateTimeOffset MisfireTime
+    // ReSharper disable once UnusedMember.Global
+    protected static DateTimeOffset MisfireTime
     {
         [MethodImpl(MethodImplOptions.Synchronized)]
         get
@@ -70,12 +79,13 @@ public partial class RavenJobStore
     }
 
     [TimeSpanParseRule(TimeSpanParseRule.Milliseconds)]
-    private TimeSpan MisfireThreshold
+    public static TimeSpan MisfireThreshold
     {
         [MethodImpl(MethodImplOptions.Synchronized)]
         get => MisfireThresholdValue;
         
         [MethodImpl(MethodImplOptions.Synchronized)]
+        // ReSharper disable once UnusedMember.Global
         set
         {
             if (value.TotalMilliseconds < 1) throw new ArgumentException("MisfireThreshold must be larger than 0");
@@ -89,10 +99,12 @@ public partial class RavenJobStore
 
     public bool Clustered => false;
 
+    [JsonProperty]
     public string InstanceId { get; set; } = "instance_two";
 
     public string InstanceName { get; set; } = "UnitTestScheduler";
 
+    [JsonProperty]
     public int ThreadPoolSize { get; set; }
 
     internal ILogger<RavenJobStore> Logger { get; set; } = NullLoggerFactory.Instance.CreateLogger<RavenJobStore>();

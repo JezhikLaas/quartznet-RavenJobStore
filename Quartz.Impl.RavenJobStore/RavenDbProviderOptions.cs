@@ -14,6 +14,7 @@ public class RavenDbProviderOptions
     /// <summary>
     ///     The default database to use for the scheduler data.
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     public string Database
     {
         set => _options.SetProperty("quartz.jobStore.database", value);
@@ -22,6 +23,7 @@ public class RavenDbProviderOptions
     /// <summary>
     ///     The URL(s) to one or more database servers.
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     public string[] Urls
     {
         set => _options.SetProperty("quartz.jobStore.urls", JsonSerializer.Serialize(value));
@@ -30,6 +32,7 @@ public class RavenDbProviderOptions
     /// <summary>
     ///     Optional certificate path for authentication.
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     public string CertPath
     {
         set => _options.SetProperty("quartz.jobStore.certPath", value);
@@ -38,6 +41,7 @@ public class RavenDbProviderOptions
     /// <summary>
     ///     Optional certificate password.
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     public string CertPass
     {
         set => _options.SetProperty("quartz.jobStore.certPass", value);

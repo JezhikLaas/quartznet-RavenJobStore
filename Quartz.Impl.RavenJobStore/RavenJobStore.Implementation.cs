@@ -107,9 +107,7 @@ public partial class RavenJobStore
         var triggerToStore = await CreateConfiguredTriggerAsync
         (
             newTrigger,
-            cancellationToken,
-            session
-        ).ConfigureAwait(false);
+            session, cancellationToken).ConfigureAwait(false);
         
         await session
             .StoreAsync(triggerToStore, triggerToStore.Key, cancellationToken)
@@ -288,7 +286,7 @@ public partial class RavenJobStore
         return true;
     }
 
-    internal async Task<bool> RemoveJobsAsync(IReadOnlyCollection<JobKey> jobKeys, CancellationToken token)
+    internal async Task<bool> RemoveJobsAsync(IEnumerable<JobKey> jobKeys, CancellationToken token)
     {
         TraceEnter(Logger);
         
@@ -354,7 +352,7 @@ public partial class RavenJobStore
             throw new JobPersistenceException($"The job ({newTrigger.JobKey}) referenced by the trigger does not exist.");
         }
 
-        var trigger = await CreateConfiguredTriggerAsync(newTrigger, token, session);
+        var trigger = await CreateConfiguredTriggerAsync(newTrigger, session, token);
 
         await session
             .StoreAsync(trigger, trigger.Key, token)
@@ -516,9 +514,7 @@ public partial class RavenJobStore
         var triggerToStore = await CreateConfiguredTriggerAsync
         (
             newTrigger,
-            token,
-            session
-        ).ConfigureAwait(false);
+            session, token).ConfigureAwait(false);
 
         await session
             .StoreAsync(triggerToStore, triggerToStore.Key, token)
@@ -1020,24 +1016,23 @@ public partial class RavenJobStore
 
         while (await stream.MoveNextAsync().ConfigureAwait(false))
         {
-            if (matcher.IsMatch(stream.Current.Document.TriggerKey))
-            {
-                result.Add(stream.Current.Document.Group);
+            if (matcher.IsMatch(stream.Current.Document.TriggerKey) == false) continue;
+            
+            result.Add(stream.Current.Document.Group);
 
-                if (stream.Current.Document.State == InternalTriggerState.Complete) continue;
+            if (stream.Current.Document.State == InternalTriggerState.Complete) continue;
 
-                stream.Current.Document.State = stream.Current.Document.State == InternalTriggerState.Blocked
-                    ? InternalTriggerState.PausedAndBlocked 
-                    : InternalTriggerState.Paused;
+            stream.Current.Document.State = stream.Current.Document.State == InternalTriggerState.Blocked
+                ? InternalTriggerState.PausedAndBlocked 
+                : InternalTriggerState.Paused;
 
-                await updateSession.StoreAsync
-                (
-                    stream.Current.Document,
-                    stream.Current.ChangeVector,
-                    stream.Current.Id,
-                    token
-                ).ConfigureAwait(false);
-            }
+            await updateSession.StoreAsync
+            (
+                stream.Current.Document,
+                stream.Current.ChangeVector,
+                stream.Current.Id,
+                token
+            ).ConfigureAwait(false);
         }
 
         if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
@@ -1096,11 +1091,10 @@ public partial class RavenJobStore
 
         jobKeys.ForEach(x =>
         {
-            if (matcher.IsMatch(x))
-            {
-                matchedJobKeys.Add(x.GetDatabaseId());
-                result.Add(x.Group);
-            }
+            if (matcher.IsMatch(x) == false) return;
+            
+            matchedJobKeys.Add(x.GetDatabaseId());
+            result.Add(x.Group);
         });
         var triggers = await GetTriggersForJobKeysAsync
         (
@@ -1178,6 +1172,7 @@ public partial class RavenJobStore
 
         var result = new HashSet<string>();
 
+        // ReSharper disable once ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
         foreach (var trigger in triggers)
         {
             if (matcher.IsMatch(trigger.TriggerKey) == false) continue;
@@ -1279,7 +1274,7 @@ public partial class RavenJobStore
     }
 
     private async Task<IReadOnlyCollection<string>> ResumeJobsAsync(
-        GroupMatcher<JobKey> matcher,
+        IMatcher<JobKey> matcher,
         CancellationToken token)
     {
         using var session = GetSession();
@@ -1299,11 +1294,10 @@ public partial class RavenJobStore
 
         jobKeys.ForEach(x =>
         {
-            if (matcher.IsMatch(x))
-            {
-                matchedJobKeys.Add(x.GetDatabaseId());
-                result.Add(x.Group);
-            }
+            if (matcher.IsMatch(x) == false) return;
+            
+            matchedJobKeys.Add(x.GetDatabaseId());
+            result.Add(x.Group);
         });
         var triggers = await GetTriggersForJobKeysAsync
         (
@@ -1383,9 +1377,7 @@ public partial class RavenJobStore
             {
                 var jobKey = new JobKey(job.Name, job.Group);
                 
-                if (acquiredJobKeysForNoConcurrentExec.Contains(jobKey)) continue;
-                
-                acquiredJobKeysForNoConcurrentExec.Add(jobKey);
+                if (acquiredJobKeysForNoConcurrentExec.Add(jobKey) == false) continue;
             }
 
             trigger.State = InternalTriggerState.Acquired;
@@ -1397,7 +1389,7 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task ReleaseAcquiredTriggerAsync(IOperableTrigger trigger, CancellationToken token)
+    private async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
     {
         using var session = GetSession();
 
@@ -1418,7 +1410,7 @@ public partial class RavenJobStore
     }
 
     private async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFiredAsync(
-        IReadOnlyCollection<IOperableTrigger> triggers,
+        IEnumerable<IOperableTrigger> triggers,
         CancellationToken token)
     {
         using var session = GetSession();
@@ -1443,9 +1435,7 @@ public partial class RavenJobStore
         {
             if (storedTrigger?.State != InternalTriggerState.Acquired) continue;
 
-            var calendar = scheduler.Calendars.TryGetValue(storedTrigger.CalendarName ?? string.Empty, out var entry)
-                ? entry
-                : null;
+            var calendar = scheduler.Calendars.GetValueOrDefault(storedTrigger.CalendarName ?? string.Empty);
 
             if (calendar == null) continue;
             
@@ -1508,7 +1498,7 @@ public partial class RavenJobStore
     }
 
     private async Task TriggeredJobCompleteAsync(
-        IOperableTrigger trigger,
+        IMutableTrigger trigger,
         IJobDetail jobDetail,
         SchedulerInstruction triggerInstCode,
         CancellationToken token)
@@ -1563,6 +1553,9 @@ public partial class RavenJobStore
 
         switch (triggerInstCode)
         {
+            case SchedulerInstruction.ReExecuteJob:
+            case SchedulerInstruction.NoInstruction:
+                break;
             case SchedulerInstruction.DeleteTrigger:
             {
                 // Deleting triggers

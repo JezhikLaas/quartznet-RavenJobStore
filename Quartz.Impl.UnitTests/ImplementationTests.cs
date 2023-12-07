@@ -23,6 +23,8 @@ public class ImplementationTests : TestBase
     {
         Target.DocumentStore!.Dispose();
         base.Dispose();
+        
+        GC.SuppressFinalize(this);
     }
 
     [Fact(DisplayName = "If no scheduler exists Then SchedulerStarted creates one")]
@@ -527,7 +529,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
 
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
@@ -548,7 +550,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = "Job",
-            JobGroup = "Group",
+            JobGroup = "Group"
         };
 
         var call = () => Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
@@ -567,7 +569,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
 
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
@@ -587,7 +589,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
 
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
@@ -629,7 +631,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -658,7 +660,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -691,7 +693,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -722,14 +724,14 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
         
         trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -774,7 +776,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -803,7 +805,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -836,7 +838,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -867,14 +869,14 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
         
         trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -905,14 +907,14 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
         
         trigger = new SimpleTriggerImpl("TriggerTwo", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -958,7 +960,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -981,7 +983,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1010,7 +1012,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1030,7 +1032,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1121,7 +1123,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1141,7 +1143,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1164,7 +1166,7 @@ public class ImplementationTests : TestBase
         var trigger = new SimpleTriggerImpl("Trigger", "Group")
         {
             JobName = job.Name,
-            JobGroup = job.Group,
+            JobGroup = job.Group
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
@@ -1356,7 +1358,7 @@ public class ImplementationTests : TestBase
             var trigger = new SimpleTriggerImpl($"Trigger{index}", "Group")
             {
                 JobName = job.Name,
-                JobGroup = job.Group,
+                JobGroup = job.Group
             };
 
             await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);

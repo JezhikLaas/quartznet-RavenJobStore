@@ -9,6 +9,7 @@ using Quartz.Util;
 namespace Quartz.Impl.RavenJobStore;
 
 [SuppressMessage("ReSharper", "UnusedMember.Global")]
+// ReSharper disable once UnusedType.Global
 public static class RavenDbProviderExtensions
 {
     public static void UseRavenDb(

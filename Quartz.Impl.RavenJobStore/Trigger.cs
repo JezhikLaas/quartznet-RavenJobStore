@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Newtonsoft.Json;
 using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Quartz.Spi;
+using JsonException = System.Text.Json.JsonException;
 
 namespace Quartz.Impl.RavenJobStore;
 
@@ -85,55 +87,77 @@ internal class Trigger
     public TriggerKey TriggerKey => 
         new(Name, Group);
 
+    [JsonProperty]
     public string Name { get; set; } = string.Empty;
     
+    [JsonProperty]
     public string Group { get; set; } = string.Empty;
-    
+
+    [JsonProperty]
     public string Key => $"{Name}/{Group}";
 
+    [JsonProperty]
     public string JobName { get; set; } = string.Empty;
     
+    [JsonProperty]
     public string JobGroup { get; set; } = string.Empty;
     
+    [JsonProperty]
     public string JobKey { get; set; } = string.Empty;
     
+    [JsonProperty]
     public string Scheduler { get; set; } = string.Empty;
 
     public InternalTriggerState State { get; set; }
     
+    [JsonProperty]
     public string? Description { get; set; }
     
+    [JsonProperty]
     public string? CalendarName { get; set; }
     
+    [JsonProperty]
     public IDictionary<string, object>? JobDataMap { get; set; }
 
     public string FireInstanceId { get; set; } = string.Empty;
     
+    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
     public int MisfireInstruction { get; set; }
     
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public DateTimeOffset? FinalFireTimeUtc { get; set; }
     
+    [JsonProperty]
     public DateTimeOffset? EndTimeUtc { get; set; }
     
+    [JsonProperty]
     public DateTimeOffset StartTimeUtc { get; set; }
-
     
+    [JsonProperty]
     public DateTimeOffset? NextFireTimeUtc { get; set; }
 
+    [JsonProperty]
     public long NextFireTimeTicks { get; set; }
 
+    [JsonProperty]
     public DateTimeOffset? PreviousFireTimeUtc { get; set; }
 
+    [JsonProperty]
     public int Priority { get; set; }
     
+    [JsonProperty]
     public bool HasMillisecondPrecision { get; set; }
 
+    [JsonProperty]
     public CronOptions? CronTriggerOptions { get; set; }
     
+    [JsonProperty]
     public SimpleOptions? SimpleTriggerOptions { get; set; }
     
+    [JsonProperty]
     public CalendarOptions? CalendarIntervalTriggerOptions { get; set; }
     
+    [JsonProperty]
     public DailyTimeOptions? DailyTimeIntervalTriggerOptions { get; set; }
 
     public void UpdateFireTimes(ITrigger trig)
@@ -218,51 +242,76 @@ internal class Trigger
 
     public class CronOptions
     {
-        public string? CronExpression { get; set; }
-        public string? TimeZoneId { get; set; }
+        [JsonProperty]
+        public string? CronExpression { get; init; }
+
+        [JsonProperty]
+        public string? TimeZoneId { get; init; }
     }
 
     public class SimpleOptions
     {
-        public int RepeatCount { get; set; }
-        public TimeSpan RepeatInterval { get; set; }
+        [JsonProperty]
+        public int RepeatCount { get; init; }
+
+        [JsonProperty]
+        public TimeSpan RepeatInterval { get; init; }
     }
 
     public class CalendarOptions
     {
-        public IntervalUnit RepeatIntervalUnit { get; set; }
-        public int RepeatInterval { get; set; }
-        public int TimesTriggered { get; set; }
-        public string? TimeZoneId { get; set; }
-        public bool PreserveHourOfDayAcrossDaylightSavings { get; set; }
-        public bool SkipDayIfHourDoesNotExist { get; set; }
+        [JsonProperty]
+        public IntervalUnit RepeatIntervalUnit { get; init; }
+        
+        [JsonProperty]
+        public int RepeatInterval { get; init; }
+        
+        [JsonProperty]
+        public int TimesTriggered { get; init; }
+        
+        [JsonProperty]
+        public string? TimeZoneId { get; init; }
+        
+        [JsonProperty]
+        public bool PreserveHourOfDayAcrossDaylightSavings { get; init; }
+        
+        [JsonProperty]
+        public bool SkipDayIfHourDoesNotExist { get; init; }
     }
 
     public class DailyTimeOptions
     {
-        public int RepeatCount { get; set; }
+        [JsonProperty]
+        public int RepeatCount { get; init; }
 
-        public IntervalUnit RepeatIntervalUnit { get; set; }
+        [JsonProperty]
+        public IntervalUnit RepeatIntervalUnit { get; init; }
 
-        public int RepeatInterval { get; set; }
+        [JsonProperty]
+        public int RepeatInterval { get; init; }
 
+        [JsonProperty]
         [System.Text.Json.Serialization.JsonConverter(typeof(TimeOfDayConverter))]
-        public TimeOfDay? StartTimeOfDay { get; set; }
+        public TimeOfDay? StartTimeOfDay { get; init; }
 
+        [JsonProperty]
         [System.Text.Json.Serialization.JsonConverter(typeof(TimeOfDayConverter))]
-        public TimeOfDay? EndTimeOfDay { get; set; }
+        public TimeOfDay? EndTimeOfDay { get; init; }
 
-        public IReadOnlyCollection<DayOfWeek>? DaysOfWeek { get; set; }
+        [JsonProperty]
+        public IReadOnlyCollection<DayOfWeek>? DaysOfWeek { get; init; }
 
+        [JsonProperty]
         public int TimesTriggered { get; set; }
 
-        public string? TimeZoneId { get; set; }
+        [JsonProperty]
+        public string? TimeZoneId { get; init; }
     }
 }
 
 internal class TimeOfDayConverter : System.Text.Json.Serialization.JsonConverter<TimeOfDay>
 {
-    public override TimeOfDay? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override TimeOfDay Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var hour = 0;
         var minute = 0;
@@ -270,30 +319,27 @@ internal class TimeOfDayConverter : System.Text.Json.Serialization.JsonConverter
 
         while (reader.Read())
         {
-            switch (reader.TokenType)
+            if (reader.TokenType == JsonTokenType.EndObject)
             {
-                case JsonTokenType.EndObject:
-                    return new TimeOfDay(hour, minute, second);
-               
-                case JsonTokenType.PropertyName:
+                return new TimeOfDay(hour, minute, second);
+            }
+
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                var name = reader.GetString();
+                reader.Read();
+
+                switch (name)
                 {
-                    var name = reader.GetString();
-                    reader.Read();
-
-                    switch (name)
-                    {
-                        case nameof(TimeOfDay.Hour):
-                            hour = reader.GetInt32();
-                            break;
-                        case nameof(TimeOfDay.Minute):
-                            minute = reader.GetInt32();
-                            break;
-                        case nameof(TimeOfDay.Second):
-                            second = reader.GetInt32();
-                            break;
-                    }
-
-                    break;
+                    case nameof(TimeOfDay.Hour):
+                        hour = reader.GetInt32();
+                        break;
+                    case nameof(TimeOfDay.Minute):
+                        minute = reader.GetInt32();
+                        break;
+                    case nameof(TimeOfDay.Second):
+                        second = reader.GetInt32();
+                        break;
                 }
             }
         }

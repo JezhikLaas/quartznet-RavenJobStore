@@ -1,5 +1,5 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 using Quartz.Util;
 
 namespace Quartz.Impl.RavenJobStore;
@@ -23,32 +23,41 @@ internal class Job
         JobDataMap = new Dictionary<string, object>(newJob.JobDataMap.WrappedMap);
     }
 
+    [JsonProperty]
     public string Name { get; set; } = string.Empty;
 
+    [JsonProperty]
     public string Group { get; set; } = string.Empty;
     
     public string Key => $"{Name}/{Group}";
 
+    [JsonProperty]
     public string Scheduler { get; set; } = string.Empty;
 
+    [JsonProperty]
     public string? Description { get; set; }
     
-    [JsonConverter(typeof(JobTypeConverter))]
+    [JsonProperty]
+    [System.Text.Json.Serialization.JsonConverter(typeof(JobTypeConverter))]
     public Type? JobType { get; set; }
     
+    [JsonProperty]
     public bool Durable { get; set; }
     
+    [JsonProperty]
     public bool ConcurrentExecutionDisallowed { get; set; }
     
+    [JsonProperty]
     public bool PersistJobDataAfterExecution { get; set; }
     
+    [JsonProperty]
     public bool RequestsRecovery { get; set; }
     
     public IDictionary<string, object>? JobDataMap { get; set; }
 
-    [JsonIgnore]
+    [System.Text.Json.Serialization.JsonIgnore]
     public JobKey JobKey =>
-        new JobKey(Name, Group);
+        new(Name, Group);
 
     /// <summary>
     ///     Converts this <see cref="Job"/> back into an <see cref="IJobDetail"/>.
@@ -70,9 +79,9 @@ internal class Job
     }
 }
 
-public class JobTypeConverter : JsonConverter<Type>
+public class JobTypeConverter : System.Text.Json.Serialization.JsonConverter<Type>
 {
-    public override Type? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override Type Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         throw new NotImplementedException();
     }

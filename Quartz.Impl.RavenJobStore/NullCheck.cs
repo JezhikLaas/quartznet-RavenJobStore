@@ -6,6 +6,7 @@ namespace Quartz.Impl.RavenJobStore;
 public static class NullCheck
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    // ReSharper disable once UnusedMember.Global
     public static void ThrowIfNull(
         [NotNull]this object? instance,
         [CallerArgumentExpression("instance")] string? name = null,

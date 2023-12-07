@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
@@ -25,16 +24,15 @@ public partial class RavenJobStore
         return result;
     }
 
-    private void AdvancedOnSessionDisposing(object? sender, SessionDisposingEventArgs e)
+    private static void AdvancedOnSessionDisposing(object? sender, SessionDisposingEventArgs e)
     {
-        if (e.Session is IAsyncDocumentSession session)
-        {
-            session.Advanced.OnBeforeQuery -= AdvancedOnBeforeQuery;
-            session.Advanced.OnSessionDisposing -= AdvancedOnSessionDisposing;
-        }
+        if (e.Session is not IAsyncDocumentSession session) return;
+        
+        session.Advanced.OnBeforeQuery -= AdvancedOnBeforeQuery;
+        session.Advanced.OnSessionDisposing -= AdvancedOnSessionDisposing;
     }
 
-    private void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e) => 
+    private static void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e) => 
         e.QueryCustomization.WaitForNonStaleResults();
 
     private async Task RestartTriggersForRecoveringJobsAsync(IAsyncDocumentSession session, CancellationToken token)
@@ -61,7 +59,7 @@ public partial class RavenJobStore
         }
     }
 
-    private async Task DeleteCompletedTriggersAsync(
+    private static async Task DeleteCompletedTriggersAsync(
         IAsyncDocumentSession session,
         IEnumerable<Trigger> triggers,
         CancellationToken token)
@@ -108,7 +106,7 @@ public partial class RavenJobStore
         }
     }
 
-    private void ResetInterruptedTriggers(IEnumerable<Trigger> triggers)
+    private static void ResetInterruptedTriggers(IEnumerable<Trigger> triggers)
     {
         var interruptedTriggers = triggers
             .Where
@@ -122,13 +120,13 @@ public partial class RavenJobStore
         }
     }
 
-    internal string GetFiredTriggerRecordId()
+    private static string GetFiredTriggerRecordId()
     {
         var value = Interlocked.Increment(ref _fireTimeCounter);
         return $"{value:D18}";
     }
 
-    internal async Task SetAllTriggersOfJobToStateAsync(
+    private static async Task SetAllTriggersOfJobToStateAsync(
         IAsyncDocumentSession session,
         JobKey jobKey,
         InternalTriggerState state,
@@ -146,7 +144,7 @@ public partial class RavenJobStore
         }
     }
 
-    private async Task<IReadOnlyList<Trigger>> GetTriggersForJobKeysAsync(
+    private static async Task<IReadOnlyList<Trigger>> GetTriggersForJobKeysAsync(
         IAsyncDocumentSession session,
         IReadOnlyList<string> jobKeys,
         CancellationToken token) =>
@@ -156,7 +154,7 @@ public partial class RavenJobStore
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-    internal async Task<bool> ApplyMisfireAsync(Scheduler scheduler, Trigger trigger, CancellationToken token)
+    private async Task<bool> ApplyMisfireAsync(Scheduler scheduler, Trigger trigger, CancellationToken token)
     {
         var misfireTime = SystemTime.UtcNow();
         if (MisfireThreshold > TimeSpan.Zero)
@@ -190,7 +188,7 @@ public partial class RavenJobStore
         return true;
     }
 
-    internal async Task RecoverJobStoreAsync(IAsyncDocumentSession session, CancellationToken token)
+    private async Task RecoverJobStoreAsync(IAsyncDocumentSession session, CancellationToken token)
     {
         try
         {
@@ -287,7 +285,7 @@ public partial class RavenJobStore
             .ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
+    private static async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
         IAsyncDocumentSession session,
         CancellationToken token)
     {
@@ -301,10 +299,10 @@ public partial class RavenJobStore
         return result.Select(x => x.Group).ToList();
     }
 
-    internal async Task<Trigger> CreateConfiguredTriggerAsync(
+    private async Task<Trigger> CreateConfiguredTriggerAsync(
         IOperableTrigger newTrigger,
-        CancellationToken token,
-        IAsyncDocumentSession session)
+        IAsyncDocumentSession session,
+        CancellationToken token)
     {
         var trigger = new Trigger(newTrigger, InstanceName);
 
@@ -425,31 +423,5 @@ public static class SortedSetExtensions
         }
 
         return result;
-    }
-}
-
-public class NonWaitingSession : IDisposable
-{
-    private ConcurrentDictionary<int, IAsyncDocumentSession> Ignored { get; }
-
-    public IAsyncDocumentSession Session { get; }
-
-    public NonWaitingSession(
-        ConcurrentDictionary<int, IAsyncDocumentSession> ignored,
-        IAsyncDocumentSession session)
-    {
-        Session = session;
-        Ignored = ignored;
-
-        if (Ignored.TryAdd(session.Advanced.SessionInfo.SessionId, session) == false)
-        {
-            throw new InvalidOperationException("Unable to add session to ignore list");
-        }
-    }
-
-    public void Dispose()
-    {
-        Ignored.Remove(Session.Advanced.SessionInfo.SessionId, out _);
-        Session.Dispose();
     }
 }
