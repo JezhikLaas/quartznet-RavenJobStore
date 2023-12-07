@@ -229,21 +229,62 @@ public partial class RavenJobStore
         }
     }
 
-    private async Task<bool> IsTriggerGroupPausedAsync(
+    private Task<bool> IsTriggerGroupPausedAsync(
         IAsyncDocumentSession session,
         string groupName,
         CancellationToken token)
     {
-        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
-        return scheduler.ThrowIfNull().PausedTriggerGroups.Contains(groupName);
+        var groupId = PausedTriggerGroup.GetId(InstanceName, groupName);
+        return session.Advanced.ExistsAsync(groupId, token);
+    }
+
+    private Task<bool> IsJobGroupPausedAsync(
+        IAsyncDocumentSession session,
+        string groupName,
+        CancellationToken token)
+    {
+        var groupId = PausedJobGroup.GetId(InstanceName, groupName);
+        return session.Advanced.ExistsAsync(groupId, token);
     }
 
     private async Task<IReadOnlyList<string>> GetPausedTriggerGroupsAsync(
         IAsyncDocumentSession session,
+        CancellationToken token) =>
+        await (
+            from entity in session.Query<PausedTriggerGroup>()
+            where entity.Scheduler == InstanceName
+            select entity.GroupName
+        ).ToListAsync(token).ConfigureAwait(false);
+
+    private async Task<IReadOnlyList<string>> GetPausedJobGroupsAsync(
+        IAsyncDocumentSession session,
+        CancellationToken token) =>
+        await (
+            from entity in session.Query<PausedJobGroup>()
+            where entity.Scheduler == InstanceName
+            select entity.GroupName
+        ).ToListAsync(token);
+
+    private async Task EnsurePausedTriggerGroupAsync(
+        IAsyncDocumentSession session,
+        string group,
         CancellationToken token)
     {
-        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
-        return scheduler.ThrowIfNull().PausedTriggerGroups.ToList();
+        if (await IsTriggerGroupPausedAsync(session, group, token).ConfigureAwait(false)) return;
+        await session
+            .StoreAsync(new PausedTriggerGroup(InstanceName, group), token)
+            .ConfigureAwait(false);
+    }
+
+    private async Task EnsurePausedJobGroupAsync(
+        IAsyncDocumentSession session,
+        string group,
+        CancellationToken token)
+    {
+        if (await IsJobGroupPausedAsync(session, group, token).ConfigureAwait(false)) return;
+        await session
+            .StoreAsync(new PausedJobGroup(InstanceName, group), token)
+            .ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
@@ -274,10 +315,15 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
+        var isJobGroupPaused = await IsTriggerGroupPausedAsync
+        (
+            session,
+            trigger.JobGroup,
+            token
+        ).ConfigureAwait(false); 
+
         var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
-
-        var isJobGroupPaused = scheduler.ThrowIfNull().PausedJobGroups.Contains(newTrigger.JobKey.Group);
-
+        
         if (isTriggerGroupPaused || isJobGroupPaused)
         {
             trigger.State = InternalTriggerState.Paused;

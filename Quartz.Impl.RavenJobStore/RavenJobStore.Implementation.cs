@@ -132,11 +132,7 @@ public partial class RavenJobStore
         
         using var session = GetSession();
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
-
-        var result = scheduler.ThrowIfNull().PausedJobGroups.Contains(groupName);
+        var result = await IsJobGroupPausedAsync(session, groupName, token).ConfigureAwait(false);
 
         TraceExit(Logger, result);
         
@@ -224,6 +220,11 @@ public partial class RavenJobStore
             session,
             token
         ).ConfigureAwait(false);
+        var pausedJobGroups = await GetPausedJobGroupsAsync
+        (
+            session,
+            token
+        ).ConfigureAwait(false);
 
         foreach (var (job, triggers) in triggersAndJobs)
         {
@@ -234,9 +235,11 @@ public partial class RavenJobStore
             foreach (var trigger in triggers.OfType<IOperableTrigger>())
             {
                 var triggerToInsert = new Trigger(trigger, InstanceName);
-                var isInPausedGroup = pausedTriggerGroups.Contains(triggerToInsert.Group);
+                var isInPausedGroup = pausedTriggerGroups.Contains(triggerToInsert.Group)
+                                      ||
+                                      pausedJobGroups.Contains(trigger.JobKey.Group);
 
-                if (isInPausedGroup || scheduler.PausedJobGroups.Contains(trigger.JobKey.Group))
+                if (isInPausedGroup)
                 {
                     triggerToInsert.State = InternalTriggerState.Paused;
 
@@ -598,12 +601,20 @@ public partial class RavenJobStore
 
         var triggerKeys = await (
             from trigger in session.Query<Trigger>()
+            where trigger.Scheduler == InstanceName
             select trigger.Key
         ).ToListAsync(token).ConfigureAwait(false);
 
         var jobKeys = await (
             from job in session.Query<Job>()
+            where job.Scheduler == InstanceName
             select job.Key
+        ).ToListAsync(token).ConfigureAwait(false);
+
+        var pausedTriggers = await (
+            from pausedTrigger in session.Query<PausedTriggerGroup>()
+            where pausedTrigger.Scheduler == InstanceName
+            select pausedTrigger.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var scheduler = await session
@@ -611,12 +622,11 @@ public partial class RavenJobStore
             .ConfigureAwait(false);
         
         scheduler.BlockedJobs.Clear();
-        scheduler.PausedJobGroups.Clear();
-        scheduler.PausedTriggerGroups.Clear();
         scheduler.Calendars.Clear();
         
         triggerKeys.ForEach(x => session.Delete(x));
         jobKeys.ForEach(x => session.Delete(x));
+        pausedTriggers.ForEach(x => session.Delete(x));
 
         await session
             .SaveChangesAsync(token)
@@ -939,7 +949,12 @@ public partial class RavenJobStore
 
         var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
 
-        var isJobGroupPaused = scheduler.ThrowIfNull().PausedJobGroups.Contains(trigger.JobGroup);
+        var isJobGroupPaused = await IsJobGroupPausedAsync
+        (
+            session,
+            trigger.JobGroup,
+            token
+        ).ConfigureAwait(false);
 
         if (isTriggerGroupPaused || isJobGroupPaused)
         {
@@ -994,8 +1009,6 @@ public partial class RavenJobStore
         using var session = GetNonWaitingSession();
         using var updateSession = GetSession();
         
-        var scheduler = await updateSession.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
-
         var query = session.Query<Trigger>();
 
         await using var stream = await session
@@ -1010,7 +1023,6 @@ public partial class RavenJobStore
             if (matcher.IsMatch(stream.Current.Document.TriggerKey))
             {
                 result.Add(stream.Current.Document.Group);
-                scheduler.PausedTriggerGroups.Add(stream.Current.Document.Group);
 
                 if (stream.Current.Document.State == InternalTriggerState.Complete) continue;
 
@@ -1026,6 +1038,11 @@ public partial class RavenJobStore
                     token
                 ).ConfigureAwait(false);
             }
+        }
+
+        if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
+        {
+            await EnsurePausedTriggerGroupAsync(updateSession, matcher.CompareToValue, token).ConfigureAwait(false);
         }
 
         await updateSession.SaveChangesAsync(token).ConfigureAwait(false);
@@ -1056,7 +1073,7 @@ public partial class RavenJobStore
         await session.SaveChangesAsync(token).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyCollection<string>> PauseJobsAsync(
+    internal async Task<IReadOnlyCollection<string>> PauseJobsAsync(
         GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
@@ -1064,6 +1081,7 @@ public partial class RavenJobStore
 
         var jobKeys = await (
             from job in session.Query<Job>()
+            where job.Scheduler == InstanceName
             select job.JobKey
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1090,6 +1108,11 @@ public partial class RavenJobStore
             trigger.State = trigger.State == InternalTriggerState.Blocked
                 ? InternalTriggerState.PausedAndBlocked
                 : InternalTriggerState.Paused;
+        }
+
+        if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
+        {
+            await EnsurePausedJobGroupAsync(session, matcher.CompareToValue, token).ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
@@ -1219,9 +1242,14 @@ public partial class RavenJobStore
 
             await ApplyMisfireAsync(scheduler, trigger, token).ConfigureAwait(false);
         }
-        
-        scheduler.PausedJobGroups.Clear();
 
+        var groups = await GetPausedTriggerGroupsAsync(session, token).ConfigureAwait(false);
+
+        foreach (var group in groups)
+        {
+            session.Delete(PausedTriggerGroup.GetId(InstanceName, group));
+        }
+        
         await session.SaveChangesAsync(token).ConfigureAwait(false);
     }
 
