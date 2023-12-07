@@ -12,10 +12,12 @@ internal class PausedJobGroup
     public static string GetId(string scheduler, string group) =>
         $"J{scheduler}#{group}";
     
-    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public string Id { get; set; }
     
+    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
     public string Scheduler { get; set; }
     
+    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
     public string GroupName { get; set; }
 }

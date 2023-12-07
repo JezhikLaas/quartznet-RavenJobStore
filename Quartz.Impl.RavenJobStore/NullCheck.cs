@@ -3,8 +3,6 @@ using System.Runtime.CompilerServices;
 
 namespace Quartz.Impl.RavenJobStore;
 
-#nullable enable
-
 public static class NullCheck
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -29,5 +27,3 @@ public static class NullCheck
         return instance;
     }
 }
-
-#nullable restore

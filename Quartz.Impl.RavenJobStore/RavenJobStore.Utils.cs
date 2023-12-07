@@ -160,16 +160,16 @@ public partial class RavenJobStore
     {
         var misfireTime = SystemTime.UtcNow();
         if (MisfireThreshold > TimeSpan.Zero)
+        {
             misfireTime = misfireTime.AddMilliseconds(-1 * MisfireThreshold.TotalMilliseconds);
+        }
 
         var fireTimeUtc = trigger.NextFireTimeUtc;
         if (!fireTimeUtc.HasValue || fireTimeUtc.Value > misfireTime
                                   || trigger.MisfireInstruction == MisfireInstruction.IgnoreMisfirePolicy)
             return false;
 
-        var calendar = scheduler.Calendars.TryGetValue(trigger.CalendarName ?? string.Empty, out var schedulerCalendar)
-            ? schedulerCalendar
-            : null;
+        var calendar = scheduler.Calendars.GetValueOrDefault(trigger.CalendarName ?? string.Empty);
 
         var operableTrigger = trigger.Deserialize();
         await Signaler.NotifyTriggerListenersMisfired(operableTrigger, token);
@@ -315,7 +315,7 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
-        var isJobGroupPaused = await IsTriggerGroupPausedAsync
+        var isJobGroupPaused = await IsJobGroupPausedAsync
         (
             session,
             trigger.JobGroup,

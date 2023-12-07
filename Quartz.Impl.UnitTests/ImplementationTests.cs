@@ -189,6 +189,35 @@ public class ImplementationTests : TestBase
         result.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "If requested group is known and paused Then matching triggers are paused")]
+    public async Task If_requested_group_is_known_and_paused_Then_matching_triggers_are_paused()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+ 
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        var trigger = new SimpleTriggerImpl("Trigger", "known")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group
+        };
+
+        var set = new Dictionary<IJobDetail, IReadOnlyCollection<ITrigger>>
+        {
+            { job, new[] { trigger } }
+        };
+
+        await Target.StoreJobsAndTriggersAsync(set, false, CancellationToken.None);
+        await Target.PauseTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("known"), CancellationToken.None);
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "known"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Paused);
+    }
+
     [Fact(DisplayName = "If no scheduler exists Then IsTriggerGroupPaused does not throw")]
     public async Task If_no_scheduler_exists_Then_IsTriggerGroupPaused_does_not_throw()
     {
@@ -1847,5 +1876,262 @@ public class ImplementationTests : TestBase
         );
 
         state.Should().Be(TriggerState.Paused);
+    }
+
+    [Fact(DisplayName = "If a job group is paused Then later added triggers are paused as well")]
+    public async Task If_a_job_group_is_paused_Then_later_added_triggers_are_paused_as_well()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        await Target.PauseJobsAsync(GroupMatcher<JobKey>.GroupEquals("Group"), CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Paused);
+    }
+
+    [Fact(DisplayName = "If a specific job is paused Then all referencing triggers are paused")]
+    public async Task If_a_specific_job_is_paused_Then_all_referencing_triggers_are_paused()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger1", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger2", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+        
+        await Target.PauseJobAsync(new JobKey("Job", "Group"), CancellationToken.None);
+
+        var state1 = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger1", "Group"),
+            CancellationToken.None
+        );
+        var state2 = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger2", "Group"),
+            CancellationToken.None
+        );
+        
+        state1.Should().Be(TriggerState.Paused);
+        state2.Should().Be(TriggerState.Paused);
+    }
+
+    [Fact(DisplayName = "If a job group is paused Then existing matching triggers are paused")]
+    public async Task If_a_job_group_is_paused_Then_existing_matching_triggers_are_paused()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger1", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger2", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+        
+        await Target.PauseJobsAsync(GroupMatcher<JobKey>.GroupEquals("Group"), CancellationToken.None);
+
+        var state1 = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger1", "Group"),
+            CancellationToken.None
+        );
+        var state2 = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger2", "Group"),
+            CancellationToken.None
+        );
+        
+        state1.Should().Be(TriggerState.Paused);
+        state2.Should().Be(TriggerState.Paused);
+    }
+
+    [Fact(DisplayName = "If a paused not blocked trigger is resumed Then it goes to normal")]
+    public async Task If_a_paused_not_blocked_trigger_is_resumed_Then_it_goes_to_normal()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        await Target.PauseTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+        await Target.ResumeTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Normal);
+    }
+
+    [Fact(DisplayName = "If a paused and blocked trigger is resumed Then it goes to blocked")]
+    public async Task If_a_paused_and_blocked_trigger_is_resumed_Then_it_goes_to_blocked()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        using (var session = Target.DocumentStore!.OpenAsyncSession())
+        {
+            var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
+            scheduler.BlockedJobs.Add("Job/Group");
+
+            await session.SaveChangesAsync();
+        }
+        
+        WaitForIndexing(Target.DocumentStore!);
+
+        await Target.PauseTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+        await Target.ResumeTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Blocked);
+    }
+
+    [Fact(DisplayName = "If a by group paused trigger is resumed Then it goes to normal")]
+    public async Task If_a_by_group_paused_trigger_is_resumed_Then_it_goes_to_normal()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        await Target.PauseTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+        await Target.ResumeTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Normal);
+    }
+
+    [Fact(DisplayName = "If a by group paused trigger is resumed Then the group stays paused")]
+    public async Task If_a_by_group_paused_trigger_is_resumed_Then_the_group_stays_paused()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        await Target.PauseTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+        await Target.ResumeTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
+
+        var result = await Target.IsTriggerGroupPausedAsync("Group", CancellationToken.None);
+
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "If a by group paused trigger is resumed by group Then it goes to normal")]
+    public async Task If_a_by_group_paused_trigger_is_resumed_by_group_Then_it_goes_to_normal()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        await Target.PauseTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+        await Target.ResumeTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+
+        var state = await Target.GetTriggerStateAsync
+        (
+            new TriggerKey("Trigger", "Group"),
+            CancellationToken.None
+        );
+
+        state.Should().Be(TriggerState.Normal);
+    }
+
+    [Fact(DisplayName = "If a by group paused trigger is resumed by group Then the group is un-paused")]
+    public async Task If_a_by_group_paused_trigger_is_resumed_by_group_Then_the_group_is_un_paused()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+        await Target.StoreTriggerAsync
+        (
+            new SimpleTriggerImpl("Trigger", "Group") { JobName = job.Name, JobGroup = job.Group },
+            false,
+            CancellationToken.None
+        );
+
+        await Target.PauseTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+        await Target.ResumeTriggersAsync(GroupMatcher<TriggerKey>.GroupEquals("Group"), CancellationToken.None);
+
+        var result = await Target.IsTriggerGroupPausedAsync("Group", CancellationToken.None);
+
+        result.Should().BeFalse();
     }
 }

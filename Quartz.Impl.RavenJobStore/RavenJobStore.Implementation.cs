@@ -1052,8 +1052,10 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task PauseJobAsync(JobKey jobKey, CancellationToken token)
+    internal async Task PauseJobAsync(JobKey jobKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var triggers = await GetTriggersForJobKeysAsync
@@ -1071,12 +1073,16 @@ public partial class RavenJobStore
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
     internal async Task<IReadOnlyCollection<string>> PauseJobsAsync(
         GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var jobKeys = await (
@@ -1116,12 +1122,16 @@ public partial class RavenJobStore
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }
 
-    private async Task ResumeTriggerAsync(TriggerKey triggerKey, CancellationToken token)
+    internal async Task ResumeTriggerAsync(TriggerKey triggerKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var trigger = await session
@@ -1143,17 +1153,22 @@ public partial class RavenJobStore
         await ApplyMisfireAsync(scheduler, trigger, token).ConfigureAwait(false);
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task<IReadOnlyCollection<string>> ResumeTriggersAsync(
+    internal async Task<IReadOnlyCollection<string>> ResumeTriggersAsync(
         GroupMatcher<TriggerKey> matcher,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var triggers = await (
             from trigger in session.Query<Trigger>()
                 .Include(x => x.Scheduler)
+            where trigger.Scheduler == InstanceName
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1177,7 +1192,14 @@ public partial class RavenJobStore
             result.Add(trigger.TriggerKey.Group);
         }
 
+        if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
+        {
+            session.Delete(PausedTriggerGroup.GetId(InstanceName, matcher.CompareToValue));
+        }
+
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }
@@ -1185,7 +1207,6 @@ public partial class RavenJobStore
     private async Task<IReadOnlyList<string>> GetPausedTriggerGroupsAsync(CancellationToken token)
     {
         using var session = GetSession();
-
         return await GetPausedTriggerGroupsAsync(session, token).ConfigureAwait(false);
     }
 
