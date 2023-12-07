@@ -1210,8 +1210,10 @@ public partial class RavenJobStore
         return await GetPausedTriggerGroupsAsync(session, token).ConfigureAwait(false);
     }
 
-    private async Task ResumeJobAsync(JobKey jobKey, CancellationToken token)
+    internal async Task ResumeJobAsync(JobKey jobKey, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var triggers = await GetTriggersForJobKeysAsync
@@ -1237,6 +1239,8 @@ public partial class RavenJobStore
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
     private async Task ResumeAllTriggersAsync(CancellationToken token)
