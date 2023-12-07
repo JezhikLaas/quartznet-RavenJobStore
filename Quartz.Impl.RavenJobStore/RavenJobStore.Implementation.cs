@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using Quartz.Impl.Matchers;
@@ -1238,8 +1239,10 @@ public partial class RavenJobStore
         TraceExit(Logger);
     }
 
-    private async Task ResumeAllTriggersAsync(CancellationToken token)
+    internal async Task ResumeAllTriggersAsync(CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var triggers = await (
@@ -1271,17 +1274,22 @@ public partial class RavenJobStore
         }
         
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger);
     }
 
-    private async Task<IReadOnlyCollection<string>> ResumeJobsAsync(
-        IMatcher<JobKey> matcher,
+    internal async Task<IReadOnlyCollection<string>> ResumeJobsAsync(
+        GroupMatcher<JobKey> matcher,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var jobKeys = await (
             from job in session.Query<Job>()
                 .Include(x => x.Scheduler)
+            where job.Scheduler == InstanceName
             select job.JobKey
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1317,44 +1325,57 @@ public partial class RavenJobStore
             await ApplyMisfireAsync(scheduler, trigger, token).ConfigureAwait(false);
         }
 
+        if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
+        {
+            session.Delete(PausedJobGroup.GetId(InstanceName, matcher.CompareToValue));
+        }
+
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }
 
-    private async Task<IReadOnlyCollection<IOperableTrigger>> AcquireNextTriggersAsync(
+    internal async Task<IReadOnlyCollection<IOperableTrigger>> AcquireNextTriggersAsync(
         DateTimeOffset noLaterThan,
         int maxCount,
         TimeSpan timeWindow,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var result = new List<IOperableTrigger>();
         var acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
 
+        var upperLimit = (noLaterThan + timeWindow).Ticks;
+
         var storedTriggers = await (
             from trigger in session.Query<Trigger>()
                 .Include(x => x.Scheduler)
                 .Include(x => x.JobKey)
-            where trigger.State == InternalTriggerState.Waiting
+            where trigger.Scheduler == InstanceName
                   &&
-                  trigger.NextFireTimeUtc <= (noLaterThan + timeWindow).UtcDateTime
+                  trigger.State == InternalTriggerState.Waiting
+                  &&
+                  trigger.NextFireTimeTicks <= upperLimit 
             orderby trigger.NextFireTimeTicks,
                     trigger.Priority descending
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
         // Copy the list to another list, we may need to modify it.
-        var candidateTriggers = new SortedSet<Trigger>(storedTriggers, new TriggerComparator());
+        var candidateTriggers = new PriorityQueue<Trigger, int>(storedTriggers.Select(x => (x, -x.Priority)));
 
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
 
-        while (candidateTriggers.Any() && result.Count < maxCount)
+        while (candidateTriggers.Count > 0 && result.Count < maxCount)
         {
-            var trigger = candidateTriggers.Pop();
+            var trigger = candidateTriggers.Dequeue();
             if (trigger.NextFireTimeUtc == null) continue;
             
             var misfireApplied = await ApplyMisfireAsync(scheduler, trigger, token).ConfigureAwait(false);
@@ -1362,7 +1383,7 @@ public partial class RavenJobStore
             {
                 if (trigger.NextFireTimeUtc != null)
                 {
-                    candidateTriggers.Add(trigger);
+                    candidateTriggers.Enqueue(trigger, -trigger.Priority);
                     continue;
                 }
             }
@@ -1385,6 +1406,8 @@ public partial class RavenJobStore
 
             result.Add(trigger.Deserialize());
         }
+        
+        TraceExit(Logger, result);
 
         return result;
     }
@@ -1554,6 +1577,7 @@ public partial class RavenJobStore
         switch (triggerInstCode)
         {
             case SchedulerInstruction.ReExecuteJob:
+                break;
             case SchedulerInstruction.NoInstruction:
                 break;
             case SchedulerInstruction.DeleteTrigger:
@@ -1607,6 +1631,8 @@ public partial class RavenJobStore
                 ).ConfigureAwait(false);
                 Signaler.SignalSchedulingChange(null, token);
                 break;
+            default:
+                throw new UnreachableException("Unexpected case");
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);

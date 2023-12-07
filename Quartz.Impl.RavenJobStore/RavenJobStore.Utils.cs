@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Quartz.Simpl;
@@ -318,9 +317,12 @@ public partial class RavenJobStore
             session,
             trigger.JobGroup,
             token
-        ).ConfigureAwait(false); 
+        ).ConfigureAwait(false);
 
-        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
+        var scheduler =
+        (
+            await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false)
+        ).ThrowIfNull();
         
         if (isTriggerGroupPaused || isJobGroupPaused)
         {
@@ -335,7 +337,7 @@ public partial class RavenJobStore
         {
             trigger.State = InternalTriggerState.Blocked;
         }
-
+        
         return trigger;
     }
 
@@ -404,24 +406,4 @@ public partial class RavenJobStore
 
     [LoggerMessage(Level = LogLevel.Trace, EventId = 5, Message = "Exit {name} with {result}")]
     public static partial void TraceExit(ILogger logger, object? result, [CallerMemberName]string? name = null);
-}
-
-public static class SortedSetExtensions
-{
-    public static T Pop<T>(this SortedSet<T> instance)
-    {
-        if (instance.Any() == false)
-        {
-            throw new InvalidOperationException("Set contains no more elements");
-        }
-
-        var result = instance.First();
-
-        if (instance.Remove(result) == false)
-        {
-            throw new UnreachableException("Unable to remove first element from set");
-        }
-
-        return result;
-    }
 }

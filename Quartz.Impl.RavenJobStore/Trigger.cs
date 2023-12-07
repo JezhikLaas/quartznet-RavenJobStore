@@ -319,6 +319,7 @@ internal class TimeOfDayConverter : System.Text.Json.Serialization.JsonConverter
 
         while (reader.Read())
         {
+            // ReSharper disable once ConvertIfStatementToSwitchStatement
             if (reader.TokenType == JsonTokenType.EndObject)
             {
                 return new TimeOfDay(hour, minute, second);
@@ -357,27 +358,4 @@ internal static class TriggerKeyExtensions
 {
     public static string GetDatabaseId(this TriggerKey triggerKey) => 
         $"{triggerKey.Name}/{triggerKey.Group}";
-}
-
-internal class TriggerComparator : IComparer<Trigger>
-{
-    public int Compare(Trigger? triggerOne, Trigger? triggerTwo)
-    {
-        var timeOne = triggerOne?.NextFireTimeUtc;
-        var timeTwo = triggerTwo?.NextFireTimeUtc;
-
-        if (timeOne != null || timeTwo != null)
-        {
-            if (timeOne == null) return 1;
-
-            if (timeTwo == null) return -1;
-
-            if (timeOne < timeTwo) return -1;
-
-            if (timeOne > timeTwo) return 1;
-        }
-
-        var comparison = triggerTwo?.Priority ?? 0 - triggerOne?.Priority ?? 0;
-        return comparison != 0 ? comparison : 0;
-    }
 }
