@@ -24,7 +24,7 @@ public class ImplementationTests : TestBase
         Output = output;
         Target = new RavenJobStore(store)
         {
-            Logger = output.BuildLoggerFor<RavenJobStore>()
+            Logger = Output.BuildLoggerFor<RavenJobStore>()
         };
     }
 
@@ -1246,7 +1246,7 @@ public class ImplementationTests : TestBase
             "Group",
             job.Name,
             job.Group,
-            DateTimeOffset.UtcNow.AddMinutes(1),
+            SystemTime.UtcNow().AddMinutes(2),
             null,
             SimpleTriggerImpl.RepeatIndefinitely,
             TimeSpan.FromMinutes(1)

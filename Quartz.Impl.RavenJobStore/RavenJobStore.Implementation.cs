@@ -50,6 +50,8 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
         
+        Logger.LogDebug("Scheduler started at {0}", SystemTime.UtcNow());
+        
         using var session = GetSession();
 
         var exists = await session.Advanced.ExistsAsync(InstanceName, token);
