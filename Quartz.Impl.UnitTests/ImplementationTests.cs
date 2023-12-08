@@ -1256,9 +1256,13 @@ public class ImplementationTests : TestBase
         };
         await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
 
-        var calendarStart = trigger.StartTimeUtc.AddHours(1); 
+        var calendarStart = trigger.StartTimeUtc.AddMinutes(30);
 
-        var calendar = new DailyCalendar(calendarStart.UtcDateTime, calendarStart.AddHours(1).UtcDateTime);
+        var calendar = new DailyCalendar
+        (
+            calendarStart.UtcDateTime,
+            calendarStart.AddMinutes(30).UtcDateTime
+        ) { InvertTimeRange = true, TimeZone = TimeZoneInfo.Utc };
 
         var nextFireTime = trigger.GetFireTimeAfter(null)!.Value;
         var isIncluded = calendar.IsTimeIncluded(nextFireTime);
