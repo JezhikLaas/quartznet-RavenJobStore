@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Quartz.Impl.Calendar;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.Triggers;
@@ -1259,6 +1260,18 @@ public class ImplementationTests : TestBase
         var calendarStart = trigger.StartTimeUtc.AddHours(1); 
 
         var calendar = new DailyCalendar(calendarStart.Ticks, calendarStart.AddHours(1).Ticks);
+
+        var nextFireTime = trigger.GetFireTimeAfter(null)!.Value;
+        var isIncluded = calendar.IsTimeIncluded(nextFireTime);
+
+        isIncluded.Should().BeFalse
+        (
+            "Calendar range {0} - {1} should not include {2}",
+            calendar.RangeStartingTime,
+            calendar.RangeEndingTime,
+            trigger.GetNextFireTimeUtc()
+        );
+        
         await Target.StoreCalendarAsync("test", calendar, true, true, CancellationToken.None);
 
         var checkTrigger = await Target.RetrieveTriggerAsync(trigger.Key, CancellationToken.None);
