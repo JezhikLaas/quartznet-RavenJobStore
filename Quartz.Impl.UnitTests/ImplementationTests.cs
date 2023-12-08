@@ -1195,18 +1195,16 @@ public class ImplementationTests : TestBase
 
         using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
         {
-            var scheduler = await arrangeSession.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add("Test");
-
+            await arrangeSession.StoreAsync(new BlockedJob(Target.InstanceName, "X"));
             await arrangeSession.SaveChangesAsync();
         }
 
         await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
     
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var check = await session.LoadAsync<Scheduler>(Target.InstanceName);
+        var anyBlocks = await Target.GetBlockedJobsAsync(session, CancellationToken.None);
 
-        check.BlockedJobs.Should().BeEmpty();
+        anyBlocks.Should().BeEmpty();
     }
 
     [Fact(DisplayName = "If a calendar exist Then ClearAllSchedulingData removes it")]
@@ -1718,8 +1716,10 @@ public class ImplementationTests : TestBase
             );
             entity.State = InternalTriggerState.Error;
 
-            var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add(job.Key.GetDatabaseId(Target.InstanceName));
+            await session.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName))
+            );
 
             await session.SaveChangesAsync();
         }
@@ -2080,8 +2080,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add(Job.GetId(Target.InstanceName, "Group", "Job"));
+            await session.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName))
+            );
 
             await session.SaveChangesAsync();
         }
@@ -2250,9 +2252,11 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add(Job.GetId(Target.InstanceName, "Group", "Job"));
-
+            await session.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName, Job.GetId(Target.InstanceName, "Group", "Job"))
+            );
+            
             await session.SaveChangesAsync();
         }
         

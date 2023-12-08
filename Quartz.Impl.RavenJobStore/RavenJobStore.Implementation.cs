@@ -62,6 +62,7 @@ public partial class RavenJobStore
         await DocumentStore!.ExecuteIndexAsync(new PausedTriggerGroupIndex(), token: token).ConfigureAwait(false);
         await DocumentStore!.ExecuteIndexAsync(new PausedJobGroupIndex(), token: token).ConfigureAwait(false);
         await DocumentStore!.ExecuteIndexAsync(new CalendarIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new BlockedJobIndex(), token: token).ConfigureAwait(false);
         
         using var session = GetSession();
 
@@ -234,9 +235,6 @@ public partial class RavenJobStore
         
         await using var bulkInsert = DocumentStore.ThrowIfNull().BulkInsert(token: token);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
         var pausedTriggerGroups = await GetPausedTriggerGroupsAsync
         (
             session,
@@ -261,16 +259,23 @@ public partial class RavenJobStore
                                       ||
                                       pausedJobGroups.Contains(trigger.JobKey.Group);
 
+                var isJobBlocked = await IsJobBlockedAsync
+                (
+                    session,
+                    trigger.JobKey.GetDatabaseId(InstanceName),
+                    token
+                ).ConfigureAwait(false);
+
                 if (isInPausedGroup)
                 {
                     triggerToInsert.State = InternalTriggerState.Paused;
 
-                    if (scheduler.BlockedJobs.Contains(trigger.JobKey.GetDatabaseId(InstanceName)))
+                    if (isJobBlocked)
                     {
                         triggerToInsert.State = InternalTriggerState.PausedAndBlocked;
                     }
                 }
-                else if (scheduler.BlockedJobs.Contains(trigger.JobKey.GetDatabaseId(InstanceName)))
+                else if (isJobBlocked)
                 {
                     triggerToInsert.State = InternalTriggerState.Blocked;
                 }
@@ -651,17 +656,18 @@ public partial class RavenJobStore
             select calendar.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
-        
-        scheduler.BlockedJobs.Clear();
-        
+        var blockedJobs = await (
+            from blockedJob in session.Query<BlockedJob>(nameof(BlockedJobIndex))
+            where blockedJob.Scheduler == InstanceName
+            select blockedJob.Id
+        ).ToListAsync(token).ConfigureAwait(false);
+
         triggers.ForEach(x => session.Delete(x));
         jobs.ForEach(x => session.Delete(x));
         pausedTriggerGroups.ForEach(x => session.Delete(x));
         pausedJobGroups.ForEach(x => session.Delete(x));
         calendars.ForEach(x => session.Delete(x));
+        blockedJobs.ForEach(x => session.Delete(x));
 
         await session
             .SaveChangesAsync(token)
@@ -1009,25 +1015,31 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
-        var scheduler = await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false);
-
         var isJobGroupPaused = await IsJobGroupPausedAsync
         (
             session,
             trigger.JobGroup,
             token
         ).ConfigureAwait(false);
+        
+        var isJobBlocked = await IsJobBlockedAsync
+        (
+            session,
+            trigger.JobId,
+            token
+        ).ConfigureAwait(false);
+
 
         if (isTriggerGroupPaused || isJobGroupPaused)
         {
             trigger.State = InternalTriggerState.Paused;
 
-            if (scheduler.BlockedJobs.Contains(trigger.JobId))
+            if (isJobBlocked)
             {
                 trigger.State = InternalTriggerState.PausedAndBlocked;
             }
         }
-        else if (scheduler.BlockedJobs.Contains(trigger.JobId))
+        else if (isJobBlocked)
         {
             trigger.State = InternalTriggerState.Blocked;
         }
@@ -1200,19 +1212,22 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var trigger = await session
-            .Include<Trigger>(x => x.CalendarId) // preload
-            .Include<Trigger>(x => x.Scheduler) // preload
+            .Include<Trigger>(x => x.CalendarId)
             .LoadAsync<Trigger>(triggerKey.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
 
         if (trigger == null) return;
         if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) return;
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
+        var isJobBlocked = await IsJobBlockedAsync
+        (
+            session,
+            trigger.JobId,
+            token
+        ).ConfigureAwait(false);
 
-        trigger.State = scheduler.BlockedJobs.Contains(trigger.JobId)
+
+        trigger.State = isJobBlocked
             ? InternalTriggerState.Blocked
             : InternalTriggerState.Waiting;
 
@@ -1233,15 +1248,12 @@ public partial class RavenJobStore
 
         var triggers = await (
             from trigger in session.Query<Trigger>(nameof(TriggerIndex))
-                .Include(x => x.Scheduler)
                 .Include(x => x.CalendarId)
             where trigger.Scheduler == InstanceName
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
+        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
 
         var result = new HashSet<string>();
 
@@ -1251,7 +1263,7 @@ public partial class RavenJobStore
             if (matcher.IsMatch(trigger.TriggerKey) == false) continue;
             if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) continue;
         
-            trigger.State = scheduler.BlockedJobs.Contains(trigger.JobId)
+            trigger.State = blockedJobs.Contains(trigger.JobId)
                 ? InternalTriggerState.Blocked
                 : InternalTriggerState.Waiting;
 
@@ -1291,15 +1303,13 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
+        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
 
         foreach (var trigger in triggers)
         {
             if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) continue;
         
-            trigger.State = scheduler.BlockedJobs.Contains(trigger.JobId)
+            trigger.State = blockedJobs.Contains(trigger.JobId)
                 ? InternalTriggerState.Blocked
                 : InternalTriggerState.Waiting;
 
@@ -1320,20 +1330,17 @@ public partial class RavenJobStore
         var triggers = await (
             from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 .Include(x => x.CalendarId)
-                .Include(x => x.Scheduler)
             where trigger.Scheduler == InstanceName
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
+        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
 
         foreach (var trigger in triggers)
         {
             if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) continue;
         
-            trigger.State = scheduler.BlockedJobs.Contains(trigger.JobId)
+            trigger.State = blockedJobs.Contains(trigger.JobId)
                 ? InternalTriggerState.Blocked
                 : InternalTriggerState.Waiting;
 
@@ -1362,14 +1369,9 @@ public partial class RavenJobStore
 
         var jobKeys = await (
             from job in session.Query<Job>(nameof(JobIndex))
-                .Include(x => x.Scheduler)
             where job.Scheduler == InstanceName
             select new { job.Name, job.Group }
         ).ToListAsync(token).ConfigureAwait(false);
-
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
 
         var matchedJobKeys = new HashSet<string>();
         var result = new HashSet<string>();
@@ -1389,11 +1391,13 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
+        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+
         foreach (var trigger in triggers)
         {
             if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) continue;
         
-            trigger.State = scheduler.BlockedJobs.Contains(trigger.JobId)
+            trigger.State = blockedJobs.Contains(trigger.JobId)
                 ? InternalTriggerState.Blocked
                 : InternalTriggerState.Waiting;
 
@@ -1492,13 +1496,11 @@ public partial class RavenJobStore
         var storedTrigger = await session
             .LoadAsync<Trigger>(trigger.Key.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
-        
         if (storedTrigger is null || storedTrigger.State != InternalTriggerState.Acquired) return;
 
-        storedTrigger.State = scheduler.BlockedJobs.Contains(storedTrigger.JobId)
+        var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
+
+        storedTrigger.State = isJobBlocked
             ? InternalTriggerState.Blocked
             : InternalTriggerState.Waiting;
 
@@ -1572,11 +1574,9 @@ public partial class RavenJobStore
                         _ => trigger.State
                     };
 
-                    var thatScheduler = await session
-                        .LoadAsync<Scheduler>(InstanceName, token)
+                    await session
+                        .StoreAsync(new BlockedJob(InstanceName, trigger.JobId), token)
                         .ConfigureAwait(false);
-
-                    thatScheduler.BlockedJobs.Add(jobDetail.Key.GetDatabaseId(InstanceName));
                 }
             }
 
@@ -1597,14 +1597,10 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var entry = await session
-            .Include<Trigger>(x => x.Scheduler)
             .Include<Trigger>(x => x.JobId)
             .LoadAsync<Trigger>(trigger.Key.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
 
-        var scheduler = await session
-            .LoadAsync<Scheduler>(InstanceName, token)
-            .ConfigureAwait(false);
         var job = await session
             .LoadAsync<Job>(trigger.JobKey.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
@@ -1615,7 +1611,7 @@ public partial class RavenJobStore
 
             if (jobDetail.ConcurrentExecutionDisallowed)
             {
-                scheduler.BlockedJobs.Remove(job.Id);
+                session.Delete(BlockedJob.GetId(InstanceName, job.Id));
 
                 var triggersForJob = await (
                     from item in session.Query<Trigger>(nameof(TriggerIndex))
@@ -1639,7 +1635,7 @@ public partial class RavenJobStore
         else
         {
             // even if it was deleted, there may be cleanup to do
-            scheduler.BlockedJobs.Remove(jobDetail.Key.GetDatabaseId(InstanceName));
+            session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
         }
 
         switch (triggerInstCode)

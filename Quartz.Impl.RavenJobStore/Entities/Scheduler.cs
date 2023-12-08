@@ -24,7 +24,4 @@ public class Scheduler
     public DateTimeOffset CheckinInterval { get; set; } = DateTimeOffset.MinValue;
 
     public SchedulerState State { get; set; } = SchedulerState.Unknown;
-
-    [JsonProperty]
-    public HashSet<string> BlockedJobs { get; set; } = new();
 }

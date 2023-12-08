@@ -220,15 +220,14 @@ public partial class RavenJobStore
             ).ToListAsync(token).ConfigureAwait(false);
 
             ResetInterruptedTriggers(inconsistentTriggers);
+
+            await UnblockBlockedJobsAsync(session, token).ConfigureAwait(false);
             await DeleteCompletedTriggersAsync(session, inconsistentTriggers, token).ConfigureAwait(false);
             await RestartTriggersForRecoveringJobsAsync(session, token).ConfigureAwait(false);
 
             var scheduler = await session
                 .LoadAsync<Scheduler>(InstanceName, token)
                 .ConfigureAwait(false);
-            
-            scheduler.State = SchedulerState.Started;
-            scheduler.BlockedJobs.Clear();
             
             await session.SaveChangesAsync(token).ConfigureAwait(false);
         }
@@ -330,17 +329,24 @@ public partial class RavenJobStore
         (
             await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false)
         ).ThrowIfNull();
+
+        var isJobBlocked = await IsJobBlockedAsync
+        (
+            session,
+            newTrigger.JobKey.GetDatabaseId(InstanceName),
+            token
+        ).ConfigureAwait(false);
         
         if (isTriggerGroupPaused || isJobGroupPaused)
         {
             trigger.State = InternalTriggerState.Paused;
 
-            if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId(InstanceName)))
+            if (isJobBlocked)
             {
                 trigger.State = InternalTriggerState.PausedAndBlocked;
             }
         }
-        else if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId(InstanceName)))
+        else if (isJobBlocked)
         {
             trigger.State = InternalTriggerState.Blocked;
         }
@@ -348,6 +354,31 @@ public partial class RavenJobStore
         return trigger;
     }
 
+    private Task<bool> IsJobBlockedAsync(IAsyncDocumentSession session, string jobId, CancellationToken token) =>
+        session.Advanced.ExistsAsync(BlockedJob.GetId(InstanceName, jobId), token);
+
+    internal async Task<IReadOnlyList<string>> GetBlockedJobsAsync
+    (
+        IAsyncDocumentSession session,
+        CancellationToken token
+    ) =>
+        await (
+            from blocked in session.Query<BlockedJob>(nameof(BlockedJobIndex))
+            where blocked.Scheduler == InstanceName
+            select blocked.JobId
+        ).ToListAsync(token).ConfigureAwait(false);
+
+    private async Task UnblockBlockedJobsAsync(IAsyncDocumentSession session, CancellationToken token)
+    {
+        var ids = await (
+            from blocked in session.Query<BlockedJob>(nameof(BlockedJobIndex))
+            where blocked.Scheduler == InstanceName
+            select blocked.Id
+        ).ToListAsync(token).ConfigureAwait(false);
+        
+        ids.ForEach(session.Delete);
+    }
+    
     private void WaitForIndexing()
     {
         var operationExecutor = DocumentStore!.Maintenance.ForDatabase(DocumentStore!.Database);
