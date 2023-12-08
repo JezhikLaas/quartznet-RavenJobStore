@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Logging;
 using Quartz.Impl.Matchers;
 using Quartz.Simpl;
 using Quartz.Spi;
@@ -182,11 +183,15 @@ public partial class RavenJobStore
         
         using var session = GetSession();
 
+        var triggerIdsToAdd = triggersAndJobs
+            .SelectMany(x => x.Value.Select(t => t.Key.GetDatabaseId()))
+            .ToList();
+
         if (replace == false)
         {
             var triggerExists = await (
                 from trigger in session.Query<Trigger>()
-                where trigger.Key.In(triggersAndJobs.SelectMany(x => x.Value.Select(t => t.Key.GetDatabaseId())))
+                where trigger.Key.In(triggerIdsToAdd)
                 select trigger
             ).AnyAsync(token).ConfigureAwait(false);
 
@@ -664,6 +669,8 @@ public partial class RavenJobStore
                 where trigger.CalendarName == name
                 select trigger
             ).ToListAsync(token).ConfigureAwait(false);
+
+            Logger.LogTrace("Found {0} triggers to update", triggersToUpdate.Count);
 
             foreach (var trigger in triggersToUpdate)
             {

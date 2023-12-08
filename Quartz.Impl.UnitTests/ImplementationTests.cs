@@ -5,6 +5,7 @@ using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
+using Xunit.Abstractions;
 
 namespace Quartz.Impl.UnitTests;
 
@@ -13,11 +14,18 @@ using RavenJobStore;
 public class ImplementationTests : TestBase
 {
     private RavenJobStore Target { get; }
+    
+    private ITestOutputHelper Output { get; }
 
-    public ImplementationTests()
+    public ImplementationTests(ITestOutputHelper output)
     {
         var store = CreateStore();
-        Target = new RavenJobStore(store);
+        
+        Output = output;
+        Target = new RavenJobStore(store)
+        {
+            Logger = output.BuildLoggerFor<RavenJobStore>()
+        };
     }
 
     public override void Dispose()
