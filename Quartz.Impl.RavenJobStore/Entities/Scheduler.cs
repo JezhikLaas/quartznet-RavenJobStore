@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Quartz.Impl.RavenJobStore.Entities;
 
 public enum SchedulerState
 {

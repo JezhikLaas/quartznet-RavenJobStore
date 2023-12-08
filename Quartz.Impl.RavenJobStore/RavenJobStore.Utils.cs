@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
@@ -39,7 +40,7 @@ public partial class RavenJobStore
         var recoveringJobKeys = await (
             from job in session.Query<Job>()
             where job.Scheduler == InstanceName && job.RequestsRecovery
-            select job.Key
+            select job.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var recoveringTriggers = await GetTriggersForJobKeysAsync
@@ -51,7 +52,7 @@ public partial class RavenJobStore
 
         foreach (var trigger in recoveringTriggers)
         {
-            var operableTrigger = trigger.Deserialize();
+            var operableTrigger = trigger.Item.ThrowIfNull();
             operableTrigger.ComputeFirstFireTimeUtc(null);
 
             trigger.NextFireTimeUtc = operableTrigger.GetNextFireTimeUtc();
@@ -70,7 +71,7 @@ public partial class RavenJobStore
             )
             .ToList();
 
-        var jobKeys = completedTriggers.Select(x => x.JobKey);
+        var jobKeys = completedTriggers.Select(x => x.JobId);
         var jobs = await session.LoadAsync<Job>(jobKeys, token);
         var existingJobKeys = jobs
             .Where(x => x.Value != null)
@@ -86,13 +87,13 @@ public partial class RavenJobStore
 
         foreach (var trigger in completedTriggers)
         {
-            if (jobs.TryGetValue(trigger.JobKey, out var job))
+            if (jobs.TryGetValue(trigger.JobId, out var job))
             {
                 // We got a job for the completed trigger.
                 if (job.Durable == false)
                 {
                     // The job is not durable and may be deleted.
-                    if (triggersForJobs.Any(x => x.Key != trigger.Key && x.JobKey == job.Key) == false)
+                    if (triggersForJobs.Any(x => x.Id != trigger.Id && x.JobId == job.Id) == false)
                     {
                         // There is no other trigger than the current one
                         // referencing this job, so it has to be deleted.
@@ -101,7 +102,7 @@ public partial class RavenJobStore
                 }
             }
             
-            session.Delete(trigger.Key);
+            session.Delete(trigger.Id);
         }
     }
 
@@ -125,15 +126,17 @@ public partial class RavenJobStore
         return $"{value:D18}";
     }
 
-    private static async Task SetAllTriggersOfJobToStateAsync(
+    private async Task SetAllTriggersOfJobToStateAsync(
         IAsyncDocumentSession session,
         JobKey jobKey,
         InternalTriggerState state,
         CancellationToken token)
     {
+        var jobId = jobKey.GetDatabaseId(InstanceName);
+        
         var triggersForJob = await (
             from item in session.Query<Trigger>()
-            where item.JobKey == jobKey.GetDatabaseId()
+            where item.JobId == jobId
             select item
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -149,7 +152,7 @@ public partial class RavenJobStore
         CancellationToken token) =>
         await (
             from trigger in session.Query<Trigger>()
-            where trigger.JobKey.In(jobKeys)
+            where trigger.JobId.In(jobKeys)
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -168,11 +171,11 @@ public partial class RavenJobStore
 
         var calendar = scheduler.Calendars.GetValueOrDefault(trigger.CalendarName ?? string.Empty);
 
-        var operableTrigger = trigger.Deserialize();
+        var operableTrigger = trigger.Item.ThrowIfNull();
         await Signaler.NotifyTriggerListenersMisfired(operableTrigger, token);
         
         operableTrigger.UpdateAfterMisfire(calendar);
-        trigger.UpdateFireTimes(operableTrigger);
+        trigger.Item = operableTrigger;
 
         if (operableTrigger.GetNextFireTimeUtc().HasValue == false)
         {
@@ -328,12 +331,12 @@ public partial class RavenJobStore
         {
             trigger.State = InternalTriggerState.Paused;
 
-            if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId()))
+            if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId(InstanceName)))
             {
                 trigger.State = InternalTriggerState.PausedAndBlocked;
             }
         }
-        else if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId()))
+        else if (scheduler.BlockedJobs.Contains(newTrigger.JobKey.GetDatabaseId(InstanceName)))
         {
             trigger.State = InternalTriggerState.Blocked;
         }

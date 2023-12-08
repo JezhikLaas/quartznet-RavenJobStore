@@ -1,4 +1,5 @@
 using Quartz.Impl.Matchers;
+using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Spi;
 
 namespace Quartz.Impl.RavenJobStore;

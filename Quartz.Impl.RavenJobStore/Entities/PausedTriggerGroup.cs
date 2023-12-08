@@ -1,4 +1,6 @@
-namespace Quartz.Impl.RavenJobStore;
+using Newtonsoft.Json;
+
+namespace Quartz.Impl.RavenJobStore.Entities;
 
 internal class PausedTriggerGroup
 {
@@ -12,12 +14,12 @@ internal class PausedTriggerGroup
     public static string GetId(string scheduler, string group) =>
         $"T{scheduler}#{group}";
     
-    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+    [JsonProperty]
     public string Id { get; set; }
     
-    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+    [JsonProperty]
     public string Scheduler { get; set; }
     
-    // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+    [JsonProperty]
     public string GroupName { get; set; }
 }

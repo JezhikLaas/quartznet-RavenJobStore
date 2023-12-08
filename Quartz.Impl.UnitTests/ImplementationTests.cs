@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Quartz.Impl.Calendar;
 using Quartz.Impl.Matchers;
+using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.Triggers;
 using Quartz.Simpl;
 using Quartz.Spi;
@@ -81,8 +82,8 @@ public class ImplementationTests : TestBase
         await Target.StoreJobAndTriggerAsync(job, trigger, CancellationToken.None);
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId());
-        var checkTrigger = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId());
+        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId(Target.InstanceName));
+        var checkTrigger = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId(Target.InstanceName));
 
         checkJob.Should().NotBeNull();
         checkTrigger.Should().NotBeNull();
@@ -125,8 +126,8 @@ public class ImplementationTests : TestBase
         jobCount.Should().Be(1);
         triggerCount.Should().Be(1);
         
-        var checkJob = await session.LoadAsync<Job>(jobOne.Key.GetDatabaseId());
-        var checkTrigger = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId());
+        var checkJob = await session.LoadAsync<Job>(jobOne.Key.GetDatabaseId(Target.InstanceName));
+        var checkTrigger = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
 
         checkJob.Should()
             .NotBeNull().And
@@ -245,7 +246,7 @@ public class ImplementationTests : TestBase
         await Target.StoreJobAsync(job, false, CancellationToken.None);
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId());
+        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId(Target.InstanceName));
 
         checkJob.Should().NotBeNull();
     }
@@ -310,8 +311,8 @@ public class ImplementationTests : TestBase
         await Target.StoreJobsAndTriggersAsync(set, false, CancellationToken.None);
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId());
-        var checkTrigger = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId());
+        var checkJob = await session.LoadAsync<Job>(job.Key.GetDatabaseId(Target.InstanceName));
+        var checkTrigger = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId(Target.InstanceName));
 
         checkJob.Should().NotBeNull();
         checkTrigger.Should().NotBeNull();
@@ -1676,7 +1677,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State = given;
 
             await session.SaveChangesAsync();
@@ -1705,11 +1709,14 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State = InternalTriggerState.Error;
 
             var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add(job.Key.GetDatabaseId());
+            scheduler.BlockedJobs.Add(job.Key.GetDatabaseId(Target.InstanceName));
 
             await session.SaveChangesAsync();
         }
@@ -1724,7 +1731,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State.Should().Be(InternalTriggerState.Blocked);
         }
     }
@@ -1745,7 +1755,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State = InternalTriggerState.Error;
 
             await session.SaveChangesAsync();
@@ -1763,7 +1776,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State.Should().Be(InternalTriggerState.Paused);
         }
     }
@@ -1784,7 +1800,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State = InternalTriggerState.Error;
 
             await session.SaveChangesAsync();
@@ -1800,7 +1819,10 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await session.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await session.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State.Should().Be(InternalTriggerState.Waiting);
         }
     }
@@ -1822,7 +1844,10 @@ public class ImplementationTests : TestBase
         await Target.PauseTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var trigger = await session.LoadAsync<Trigger>("Trigger/Group");
+        var trigger = await session.LoadAsync<Trigger>
+        (
+            Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+        );
 
         trigger.State.Should().Be(InternalTriggerState.Paused);
     }
@@ -1843,7 +1868,10 @@ public class ImplementationTests : TestBase
 
         using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
         {
-            var entity = await arrangeSession.LoadAsync<Trigger>("Trigger/Group");
+            var entity = await arrangeSession.LoadAsync<Trigger>
+            (
+                Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+            );
             entity.State = InternalTriggerState.Blocked;
 
             await arrangeSession.SaveChangesAsync();
@@ -1854,7 +1882,10 @@ public class ImplementationTests : TestBase
         await Target.PauseTriggerAsync(new TriggerKey("Trigger", "Group"), CancellationToken.None);
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var trigger = await session.LoadAsync<Trigger>("Trigger/Group");
+        var trigger = await session.LoadAsync<Trigger>
+        (
+            Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+        );
 
         trigger.State.Should().Be(InternalTriggerState.PausedAndBlocked);
     }
@@ -2047,7 +2078,7 @@ public class ImplementationTests : TestBase
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
             var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add("Job/Group");
+            scheduler.BlockedJobs.Add(Job.GetId(Target.InstanceName, "Group", "Job"));
 
             await session.SaveChangesAsync();
         }
@@ -2217,7 +2248,7 @@ public class ImplementationTests : TestBase
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
             var scheduler = await session.LoadAsync<Scheduler>(Target.InstanceName);
-            scheduler.BlockedJobs.Add("Job/Group");
+            scheduler.BlockedJobs.Add(Job.GetId(Target.InstanceName, "Group", "Job"));
 
             await session.SaveChangesAsync();
         }
@@ -2418,7 +2449,10 @@ public class ImplementationTests : TestBase
         );
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var trigger = await session.LoadAsync<Trigger>("Trigger/Group");
+        var trigger = await session.LoadAsync<Trigger>
+        (
+            Trigger.GetId(Target.InstanceName, "Group", "Trigger")
+        );
 
         trigger.State.Should().Be(InternalTriggerState.Acquired);
     }
