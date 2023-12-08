@@ -1433,8 +1433,11 @@ public class ImplementationTests : TestBase
 
         job = new JobDetailImpl("Job", "Group3", typeof(NoOpJob));
         await Target.StoreJobAsync(job, false, CancellationToken.None);
+        
+        WaitForIndexing(Target.DocumentStore);
 
         var result = await Target.GetJobKeysAsync
+            
         (
             GroupMatcher<JobKey>.GroupEquals("Group2"), CancellationToken.None
         );

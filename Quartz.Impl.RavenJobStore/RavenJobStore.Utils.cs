@@ -1,11 +1,15 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Quartz.Impl.RavenJobStore.Entities;
+using Quartz.Impl.RavenJobStore.Indexes;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
+using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Session;
 using Raven.Client.Documents.Linq;
+using Raven.Client.Documents.Operations;
 using Raven.Client.Exceptions;
 
 namespace Quartz.Impl.RavenJobStore;
@@ -32,13 +36,15 @@ public partial class RavenJobStore
         session.Advanced.OnSessionDisposing -= AdvancedOnSessionDisposing;
     }
 
-    private static void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e) => 
+    private static void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e)
+    {
         e.QueryCustomization.WaitForNonStaleResults();
+    }
 
     private async Task RestartTriggersForRecoveringJobsAsync(IAsyncDocumentSession session, CancellationToken token)
     {
         var recoveringJobKeys = await (
-            from job in session.Query<Job>()
+            from job in session.Query<Job>(nameof(JobIndex))
             where job.Scheduler == InstanceName && job.RequestsRecovery
             select job.Id
         ).ToListAsync(token).ConfigureAwait(false);
@@ -254,7 +260,7 @@ public partial class RavenJobStore
         IAsyncDocumentSession session,
         CancellationToken token) =>
         await (
-            from entity in session.Query<PausedTriggerGroup>()
+            from entity in session.Query<PausedTriggerGroup>(nameof(PausedTriggerGroupIndex))
             where entity.Scheduler == InstanceName
             select entity.GroupName
         ).ToListAsync(token).ConfigureAwait(false);
@@ -263,7 +269,7 @@ public partial class RavenJobStore
         IAsyncDocumentSession session,
         CancellationToken token) =>
         await (
-            from entity in session.Query<PausedJobGroup>()
+            from entity in session.Query<PausedJobGroup>(nameof(PausedJobGroupIndex))
             where entity.Scheduler == InstanceName
             select entity.GroupName
         ).ToListAsync(token);
@@ -290,19 +296,14 @@ public partial class RavenJobStore
             .ConfigureAwait(false);
     }
 
-    private static async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
+    private async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(
         IAsyncDocumentSession session,
-        CancellationToken token)
-    {
-        var result = await (
-            from trigger in session.Query<Trigger>()
-            group trigger by trigger.Group
-            into triggerGroups
-            select new { Group = triggerGroups.Key }
+        CancellationToken token) =>
+        await (
+            from trigger in session.Query<TriggerGroupsIndex.Result>(nameof(TriggerGroupsIndex))
+            where trigger.Scheduler == InstanceName
+            select trigger.Group
         ).ToListAsync(token).ConfigureAwait(false);
-
-        return result.Select(x => x.Group).ToList();
-    }
 
     private async Task<Trigger> CreateConfiguredTriggerAsync(
         IOperableTrigger newTrigger,
@@ -345,6 +346,35 @@ public partial class RavenJobStore
         }
         
         return trigger;
+    }
+
+    private void WaitForIndexing()
+    {
+        var operationExecutor = DocumentStore!.Maintenance.ForDatabase(DocumentStore!.Database);
+        var timeout = TimeSpan.FromMinutes(1.0);
+        var stopwatch = Stopwatch.StartNew();
+        
+        while (stopwatch.Elapsed < timeout)
+        {
+            var databaseStatistics = operationExecutor.Send(new GetStatisticsOperation());
+            var done = databaseStatistics
+                .Indexes
+                .Where<IndexInformation>(x => x.State != IndexState.Disabled)
+                .All
+                (
+                    (Func<IndexInformation, bool>)(x => x.IsStale == false
+                                                        &&
+                                                        x.Name.StartsWith("ReplacementOf/") == false)
+                );
+            
+            if (done) return;
+
+            if (databaseStatistics.Indexes.All(x => x.State != IndexState.Error))
+            {
+                Thread.Sleep(100);
+            }
+            else break;
+        }
     }
 
     private async Task RetryConcurrencyConflictAsync(Task action)

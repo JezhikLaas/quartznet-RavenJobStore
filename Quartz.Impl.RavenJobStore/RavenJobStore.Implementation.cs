@@ -4,8 +4,10 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.RavenJobStore.Entities;
+using Quartz.Impl.RavenJobStore.Indexes;
 using Quartz.Simpl;
 using Quartz.Spi;
+using Quartz.Xml.JobSchedulingData20;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 
@@ -52,6 +54,15 @@ public partial class RavenJobStore
         TraceEnter(Logger);
         
         Logger.LogDebug("Scheduler started at {PointInTime}", SystemTime.UtcNow());
+        
+        // We prefer static indexes.
+        await DocumentStore!.ExecuteIndexAsync(new JobGroupsIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new TriggerGroupsIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new JobIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new TriggerIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new PausedTriggerGroupIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new PausedJobGroupIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore!.ExecuteIndexAsync(new CalendarIndex(), token: token).ConfigureAwait(false);
         
         using var session = GetSession();
 
@@ -193,7 +204,7 @@ public partial class RavenJobStore
         if (replace == false)
         {
             var triggerExists = await (
-                from trigger in session.Query<Trigger>()
+                from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 where trigger.Id.In(triggerIdsToAdd)
                 select trigger
             ).AnyAsync(token).ConfigureAwait(false);
@@ -210,7 +221,7 @@ public partial class RavenJobStore
             );
             
             var jobExists = await (
-                from job in session.Query<Job>()
+                from job in session.Query<Job>(nameof(JobIndex))
                 where job.Id.In(jobIdsToAdd)
                 select job
             ).AnyAsync(token).ConfigureAwait(false);
@@ -270,6 +281,8 @@ public partial class RavenJobStore
                     .ConfigureAwait(false);
             }
         }
+
+        await session.SaveChangesAsync(token).ConfigureAwait(false);
         
         TraceExit(Logger);
     }
@@ -610,31 +623,31 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var triggers = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
             where trigger.Scheduler == InstanceName
             select trigger.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var jobs = await (
-            from job in session.Query<Job>()
+            from job in session.Query<Job>(nameof(JobIndex))
             where job.Scheduler == InstanceName
             select job.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var pausedTriggerGroups = await (
-            from pausedTriggerGroup in session.Query<PausedTriggerGroup>()
+            from pausedTriggerGroup in session.Query<PausedTriggerGroup>(nameof(PausedTriggerGroupIndex))
             where pausedTriggerGroup.Scheduler == InstanceName
             select pausedTriggerGroup.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var pausedJobGroups = await (
-            from pausedJobGroup in session.Query<PausedJobGroup>()
+            from pausedJobGroup in session.Query<PausedJobGroup>(nameof(PausedJobGroupIndex))
             where pausedJobGroup.Scheduler == InstanceName
             select pausedJobGroup.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
         var calendars = await (
-            from calendar in session.Query<Entities.Calendar>()
+            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar.Id
         ).ToListAsync(token).ConfigureAwait(false);
@@ -669,7 +682,6 @@ public partial class RavenJobStore
         
         using var session = GetSession();
 
-        var calendarToStore = calendar.Clone();
         var scheduler = await session
             .LoadAsync<Scheduler>(InstanceName, token)
             .ConfigureAwait(false);
@@ -686,17 +698,19 @@ public partial class RavenJobStore
             throw new ObjectAlreadyExistsException($"Calendar with name '{name}' already exists");
         }
 
+        var calendarToStore = new Entities.Calendar(calendar, name, InstanceName); 
+
         await session.StoreAsync
         (
-            new Entities.Calendar(calendarToStore, name, InstanceName),
+            calendarToStore,
             token
         );
 
         if (updateTriggers)
         {
             var triggersToUpdate = await (
-                from trigger in session.Query<Trigger>()
-                where trigger.CalendarName == name
+                from trigger in session.Query<Trigger>(nameof(TriggerIndex))
+                where trigger.CalendarId == calendarToStore.Id 
                 select trigger
             ).ToListAsync(token).ConfigureAwait(false);
 
@@ -705,7 +719,7 @@ public partial class RavenJobStore
             foreach (var trigger in triggersToUpdate)
             {
                 var operableTrigger = trigger.Item.ThrowIfNull();
-                operableTrigger.UpdateWithNewCalendar(calendarToStore, MisfireThreshold);
+                operableTrigger.UpdateWithNewCalendar(calendar, MisfireThreshold);
                 
                 trigger.Item = operableTrigger;
             }
@@ -768,7 +782,8 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from job in session.Query<Job>()
+            from job in session.Query<Job>(nameof(JobIndex))
+            where job.Scheduler == InstanceName
             select job
         ).CountAsync(token).ConfigureAwait(false);
 
@@ -784,7 +799,8 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
+            where trigger.Scheduler == InstanceName
             select trigger
         ).CountAsync(token).ConfigureAwait(false);
 
@@ -800,7 +816,7 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from calendar in session.Query<Entities.Calendar>()
+            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar
         ).CountAsync(token).ConfigureAwait(false);
@@ -816,9 +832,14 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
+        WaitForIndexing();
+
         using var session = GetNonWaitingSession();
         
-        var query = session.Query<Job>().ProjectInto<JobKey>();
+        var query = session
+            .Query<Job>(nameof(JobIndex))
+            .Where(x => x.Scheduler == InstanceName)
+            .ProjectInto<JobKey>();
 
         await using var stream = await session
             .Advanced
@@ -843,9 +864,14 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
+        WaitForIndexing();
+
         using var session = GetNonWaitingSession();
         
-        var query = session.Query<Trigger>().ProjectInto<TriggerKey>();
+        var query = session
+            .Query<Trigger>(nameof(TriggerIndex))
+            .Where(x => x.Scheduler == InstanceName)
+            .ProjectInto<TriggerKey>();
 
         await using var stream = await session
             .Advanced
@@ -871,15 +897,14 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from job in session.Query<Job>()
-            group job by job.Group
-            into jobGroups
-            select new { Group = jobGroups.Key }
+            from job in session.Query<JobGroupsIndex.Result>(nameof(JobGroupsIndex))
+            where job.Scheduler == InstanceName
+            select job.Group
         ).ToListAsync(token).ConfigureAwait(false);
 
         TraceExit(Logger, result);
 
-        return result.Select(x => x.Group).ToList();
+        return result;
     }
 
     internal async Task<IReadOnlyCollection<string>> GetTriggerGroupNamesAsync(CancellationToken token)
@@ -902,7 +927,7 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from calendar in session.Query<Entities.Calendar>()
+            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar.Name
         ).ToListAsync(token).ConfigureAwait(false);
@@ -923,7 +948,7 @@ public partial class RavenJobStore
         var jobId = jobKey.GetDatabaseId(InstanceName);
 
         var triggers = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
             where trigger.JobId == jobId
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
@@ -1044,10 +1069,14 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
+        WaitForIndexing();
+
         using var session = GetNonWaitingSession();
         using var updateSession = GetSession();
         
-        var query = session.Query<Trigger>();
+        var query = session
+            .Query<Trigger>(nameof(TriggerIndex))
+            .Where(x => x.Scheduler == InstanceName);
 
         await using var stream = await session
             .Advanced
@@ -1123,7 +1152,8 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var jobKeys = await (
-            from job in session.Query<Job>()
+            from job in session.Query<Job>(nameof(JobIndex))
+            where job.Scheduler == InstanceName
             select new { job.Name, job.Group }
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1203,9 +1233,10 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var triggers = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 .Include(x => x.Scheduler)
                 .Include(x => x.CalendarId)
+            where trigger.Scheduler == InstanceName
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1288,9 +1319,10 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var triggers = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 .Include(x => x.CalendarId)
                 .Include(x => x.Scheduler)
+            where trigger.Scheduler == InstanceName
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1330,8 +1362,9 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var jobKeys = await (
-            from job in session.Query<Job>()
+            from job in session.Query<Job>(nameof(JobIndex))
                 .Include(x => x.Scheduler)
+            where job.Scheduler == InstanceName
             select new { job.Name, job.Group }
         ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1396,10 +1429,12 @@ public partial class RavenJobStore
         var upperLimit = noLaterThan + timeWindow;
 
         var storedTriggers = await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 .Include(x => x.CalendarId)
                 .Include(x => x.JobId)
-            where trigger.State == InternalTriggerState.Waiting
+            where trigger.Scheduler == InstanceName
+                  &&
+                  trigger.State == InternalTriggerState.Waiting
                   &&
                   trigger.NextFireTimeUtc <= upperLimit 
             orderby trigger.NextFireTimeUtc,
@@ -1521,7 +1556,7 @@ public partial class RavenJobStore
             if (jobDetail.ConcurrentExecutionDisallowed)
             {
                 var triggersToBlock = await (
-                    from trigger in session.Query<Trigger>()
+                    from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                         .Include(x => x.Scheduler)
                     where trigger.JobId == storedTrigger.JobId
                           &&
@@ -1584,7 +1619,7 @@ public partial class RavenJobStore
                 scheduler.BlockedJobs.Remove(job.Id);
 
                 var triggersForJob = await (
-                    from item in session.Query<Trigger>()
+                    from item in session.Query<Trigger>(nameof(TriggerIndex))
                     where item.JobId == job.Id
                     select item
                 ).ToListAsync(token).ConfigureAwait(false);
