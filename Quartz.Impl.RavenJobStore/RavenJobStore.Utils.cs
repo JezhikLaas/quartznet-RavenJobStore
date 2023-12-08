@@ -152,11 +152,12 @@ public partial class RavenJobStore
         CancellationToken token) =>
         await (
             from trigger in session.Query<Trigger>()
+                .Include(x => x.CalendarId)
             where trigger.JobId.In(jobKeys)
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-    private async Task<bool> ApplyMisfireAsync(Scheduler scheduler, Trigger trigger, CancellationToken token)
+    private async Task<bool> ApplyMisfireAsync(IAsyncDocumentSession session, Trigger trigger, CancellationToken token)
     {
         var misfireTime = SystemTime.UtcNow();
         if (MisfireThreshold > TimeSpan.Zero)
@@ -169,12 +170,14 @@ public partial class RavenJobStore
                                   || trigger.MisfireInstruction == MisfireInstruction.IgnoreMisfirePolicy)
             return false;
 
-        var calendar = scheduler.Calendars.GetValueOrDefault(trigger.CalendarName ?? string.Empty);
+        var calendar = await session
+            .LoadAsync<Entities.Calendar>(trigger.CalendarId, token)
+            .ConfigureAwait(false);
 
         var operableTrigger = trigger.Item.ThrowIfNull();
         await Signaler.NotifyTriggerListenersMisfired(operableTrigger, token);
         
-        operableTrigger.UpdateAfterMisfire(calendar);
+        operableTrigger.UpdateAfterMisfire(calendar?.Item);
         trigger.Item = operableTrigger;
 
         if (operableTrigger.GetNextFireTimeUtc().HasValue == false)

@@ -22,6 +22,9 @@ internal class Trigger : SerializeQuartzData
         JobName = trigger.JobKey?.Name ?? string.Empty;
         JobGroup = trigger.JobKey?.Group ?? string.Empty;
         JobId = trigger.JobKey != null ? trigger.JobKey.GetDatabaseId(Scheduler) : string.Empty;
+        CalendarId = string.IsNullOrEmpty(trigger.CalendarName) == false
+            ? Calendar.GetId(Scheduler, trigger.CalendarName)
+            : string.Empty;
 
         State = InternalTriggerState.Waiting;
         Description = trigger.Description;
@@ -56,6 +59,9 @@ internal class Trigger : SerializeQuartzData
     
     [JsonProperty]
     public string JobId { get; set; } = string.Empty;
+    
+    [JsonProperty]
+    public string CalendarId { get; set; } = string.Empty;
     
     [JsonProperty]
     public string Scheduler { get; set; } = string.Empty;

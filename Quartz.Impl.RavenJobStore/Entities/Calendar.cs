@@ -19,7 +19,7 @@ internal class Calendar : SerializeQuartzData
     public ICalendar? Item
     {
         get => (ICalendar?)Deserialize(QuartzData);
-        init => QuartzData = Serialize(value);
+        private init => QuartzData = Serialize(value);
     }
 
     [JsonProperty]

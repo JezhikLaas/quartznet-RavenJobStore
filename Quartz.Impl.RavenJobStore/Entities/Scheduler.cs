@@ -26,8 +26,5 @@ public class Scheduler
     public SchedulerState State { get; set; } = SchedulerState.Unknown;
 
     [JsonProperty]
-    public Dictionary<string, ICalendar> Calendars { get; set; } = new();
-
-    [JsonProperty]
     public HashSet<string> BlockedJobs { get; set; } = new();
 }
