@@ -7,7 +7,6 @@ using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.RavenJobStore.Indexes;
 using Quartz.Simpl;
 using Quartz.Spi;
-using Quartz.Xml.JobSchedulingData20;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
 
