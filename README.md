@@ -1,3 +1,5 @@
+[![build and test](https://github.com/JezhikLaas/quartznet-RavenJobStore/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/JezhikLaas/quartznet-RavenJobStore/actions/workflows/build-and-test.yml)
+
 [![Qodana](https://github.com/JezhikLaas/quartznet-RavenJobStore/actions/workflows/code_quality.yml/badge.svg)](https://github.com/JezhikLaas/quartznet-RavenJobStore/actions/workflows/code_quality.yml)
 
 
