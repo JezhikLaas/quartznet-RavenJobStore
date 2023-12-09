@@ -2672,7 +2672,7 @@ public class ImplementationTests : TestBase
         (
             DateTimeOffset.UtcNow,
             2,
-            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(10),
             CancellationToken.None
         );
 
@@ -2800,5 +2800,243 @@ public class ImplementationTests : TestBase
         var stateOne = storedTriggerOne.State;
 
         stateOne.Should().Be(InternalTriggerState.Executing);
+    }
+
+    [Fact(DisplayName = "If two triggers fire the same non concurrent job Then the lower one is resumed after completion")]
+    public async void If_two_triggers_fire_the_same_non_concurrent_job_Then_the_lower_one_is_resumed_after_completion()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+        await Target.TriggeredJobCompleteAsync
+        (
+            triggerTwo,
+            job,
+            SchedulerInstruction.NoInstruction,
+            CancellationToken.None
+        );
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+
+        stateOne.Should().Be(InternalTriggerState.Waiting);
+    }
+
+    [Fact(DisplayName = "If a delete instruction is passed to complete Then the given trigger is deleted")]
+    public async void If_a_delete_instruction_is_passed_to_complete_Then_the_given_trigger_is_deleted()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+        await Target.TriggeredJobCompleteAsync
+        (
+            triggerOne,
+            job,
+            SchedulerInstruction.DeleteTrigger,
+            CancellationToken.None
+        );
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+
+        storedTriggerOne.Should().BeNull();
+    }
+
+    [Theory(DisplayName = "If a single instruction is passed to complete Then the matching state is set")]
+    [InlineData(SchedulerInstruction.SetTriggerComplete, InternalTriggerState.Complete)]
+    [InlineData(SchedulerInstruction.SetTriggerError, InternalTriggerState.Error)]
+    [InlineData(SchedulerInstruction.NoInstruction, InternalTriggerState.Waiting)]
+    [InlineData(SchedulerInstruction.ReExecuteJob, InternalTriggerState.Waiting)]
+    public async void If_a_single_instruction_is_passed_to_complete_Then_the_matching_state_is_set(
+        SchedulerInstruction instruction,
+        InternalTriggerState expected)
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+        await Target.TriggeredJobCompleteAsync
+        (
+            triggerOne,
+            job,
+            instruction,
+            CancellationToken.None
+        );
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+
+        stateOne.Should().Be(expected);
+    }
+
+    [Theory(DisplayName = "If an all instruction is passed to complete Then the matching state is set in all triggers")]
+    [InlineData(SchedulerInstruction.SetAllJobTriggersComplete, InternalTriggerState.Complete)]
+    [InlineData(SchedulerInstruction.SetAllJobTriggersError, InternalTriggerState.Error)]
+    public async void If_an_all_instruction_is_passed_to_complete_Then_the_matching_state_is_set_in_all_triggers(
+        SchedulerInstruction instruction,
+        InternalTriggerState expected)
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+        await Target.TriggeredJobCompleteAsync
+        (
+            triggerTwo,
+            job,
+            instruction,
+            CancellationToken.None
+        );
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggers = await session.Query<Trigger>().ToListAsync();
+
+        storedTriggers.Should()
+            .HaveCount(2).And
+            .AllSatisfy(x => x.State.Should().Be(expected));
     }
 }

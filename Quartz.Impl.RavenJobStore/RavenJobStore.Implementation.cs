@@ -10,6 +10,7 @@ using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Linq;
+using Raven.Client.Documents.Session;
 
 // ReSharper disable MemberCanBePrivate.Global
 // Internal instead of private for unit tests.
@@ -1622,12 +1623,14 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task TriggeredJobCompleteAsync(
+    internal async Task TriggeredJobCompleteAsync(
         IMutableTrigger trigger,
         IJobDetail jobDetail,
         SchedulerInstruction triggerInstCode,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var entry = await session
@@ -1639,17 +1642,56 @@ public partial class RavenJobStore
             .LoadAsync<Job>(trigger.JobKey.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
 
+        var signalAfterSaveOne = await ProcessCompletedJobAsync
+        (
+            session,
+            jobDetail,
+            job,
+            token
+        ).ConfigureAwait(false);
+        
+        var signalAfterSaveTwo = await ProcessTriggerInstructionAsync
+        (
+            session,
+            trigger,
+            triggerInstCode,
+            entry,
+            token
+        ).ConfigureAwait(false);
+
+        await session.SaveChangesAsync(token).ConfigureAwait(false);
+
+        if (signalAfterSaveOne || signalAfterSaveTwo)
+        {
+            Signaler.SignalSchedulingChange(null, token);
+        }
+        
+        TraceExit(Logger);
+    }
+
+    private async Task<bool> ProcessCompletedJobAsync(
+        IAsyncDocumentSession session,
+        IJobDetail jobDetail,
+        Job? job,
+        CancellationToken token)
+    {
+        session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
+
         if (job != null)
         {
             if (jobDetail.PersistJobDataAfterExecution) job.Item = jobDetail;
 
             if (jobDetail.ConcurrentExecutionDisallowed)
             {
-                session.Delete(BlockedJob.GetId(InstanceName, job.Id));
-
                 var triggersForJob = await (
                     from item in session.Query<Trigger>(nameof(TriggerIndex))
                     where item.JobId == job.Id
+                          &&
+                          (
+                              item.State == InternalTriggerState.Blocked
+                              ||
+                              item.State == InternalTriggerState.PausedAndBlocked
+                          )
                     select item
                 ).ToListAsync(token).ConfigureAwait(false);
 
@@ -1663,76 +1705,79 @@ public partial class RavenJobStore
                     };
                 }
 
-                Signaler.SignalSchedulingChange(null, token);
+                return true;
             }
         }
-        else
-        {
-            // even if it was deleted, there may be cleanup to do
-            session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
-        }
 
+        return false;
+    }
+
+    private async Task<bool> ProcessTriggerInstructionAsync(
+        IAsyncDocumentSession session,
+        IMutableTrigger mutableTrigger,
+        SchedulerInstruction triggerInstCode,
+        Trigger trigger,
+        CancellationToken token)
+    {
         switch (triggerInstCode)
         {
             case SchedulerInstruction.ReExecuteJob:
-                break;
+                trigger.State = InternalTriggerState.Waiting;
+                return false;
+            
             case SchedulerInstruction.NoInstruction:
-                break;
+                trigger.State = InternalTriggerState.Waiting;
+                return false;
+            
             case SchedulerInstruction.DeleteTrigger:
             {
                 // Deleting triggers
-                var nextFireTime = trigger.GetNextFireTimeUtc();
+                var nextFireTime = mutableTrigger.GetNextFireTimeUtc();
                 if (nextFireTime.HasValue == false)
                 {
-                    nextFireTime = entry.NextFireTimeUtc;
+                    nextFireTime = trigger.NextFireTimeUtc;
                     if (nextFireTime.HasValue == false)
                     {
-                        session.Delete(trigger.Key.GetDatabaseId(InstanceName));
+                        session.Delete(mutableTrigger.Key.GetDatabaseId(InstanceName));
                     }
-                }
-                else
-                {
-                    session.Delete(trigger.Key.GetDatabaseId(InstanceName));
-                    Signaler.SignalSchedulingChange(null, token);
+
+                    return false;
                 }
 
-                break;
+                session.Delete(mutableTrigger.Key.GetDatabaseId(InstanceName));
+                return true;
             }
+            
             case SchedulerInstruction.SetTriggerComplete:
-                entry.State = InternalTriggerState.Complete;
-                Signaler.SignalSchedulingChange(null, token);
-                break;
+                trigger.State = InternalTriggerState.Complete;
+                return true;
 
             case SchedulerInstruction.SetTriggerError:
-                entry.State = InternalTriggerState.Error;
-                Signaler.SignalSchedulingChange(null, token);
-                break;
+                trigger.State = InternalTriggerState.Error;
+                return true;
             
             case SchedulerInstruction.SetAllJobTriggersError:
                 await SetAllTriggersOfJobToStateAsync
                 (
                     session,
-                    trigger.JobKey,
+                    mutableTrigger.JobKey,
                     InternalTriggerState.Error,
                     token
                 ).ConfigureAwait(false);
-                Signaler.SignalSchedulingChange(null, token);
-                break;
+                return true;
             
             case SchedulerInstruction.SetAllJobTriggersComplete:
                 await SetAllTriggersOfJobToStateAsync
                 (
                     session,
-                    trigger.JobKey,
+                    mutableTrigger.JobKey,
                     InternalTriggerState.Complete,
                     token
                 ).ConfigureAwait(false);
-                Signaler.SignalSchedulingChange(null, token);
-                break;
+                return true;
+
             default:
                 throw new UnreachableException("Unexpected case");
         }
-
-        await session.SaveChangesAsync(token).ConfigureAwait(false);
     }
 }
