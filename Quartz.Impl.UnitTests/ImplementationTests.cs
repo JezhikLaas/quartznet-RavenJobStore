@@ -2463,4 +2463,56 @@ public class ImplementationTests : TestBase
 
         trigger.State.Should().Be(InternalTriggerState.Acquired);
     }
+
+    [Fact(DisplayName = "If two triggers match the given slot Then acquiring orders them by priority")]
+    public async Task If_two_triggers_match_the_given_slot_Then_acquiring_orders_them_by_priority()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var result = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(2).And
+            .BeInDescendingOrder(x => x.Priority);
+    }
 }

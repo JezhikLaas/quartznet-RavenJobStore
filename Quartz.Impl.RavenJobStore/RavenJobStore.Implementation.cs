@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
@@ -1429,25 +1430,39 @@ public partial class RavenJobStore
         var result = new List<IOperableTrigger>();
         var acquiredJobKeysForNoConcurrentExec = new HashSet<JobKey>();
 
+        var skip = 0;
         var upperLimit = noLaterThan + timeWindow;
+        var requestLimit = session.Advanced.MaxNumberOfRequestsPerSession - 2;
 
-        var storedTriggers = await (
-            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
-                .Include(x => x.CalendarId)
-                .Include(x => x.JobId)
-            where trigger.Scheduler == InstanceName
-                  &&
-                  trigger.State == InternalTriggerState.Waiting
-                  &&
-                  trigger.NextFireTimeUtc <= upperLimit 
-            orderby trigger.NextFireTimeUtc,
-                    trigger.Priority descending
-            select trigger
-        ).ToListAsync(token).ConfigureAwait(false);
+        // Streaming would be much better here, because there may be a lot
+        // of matching candidates. But we may need to modify the resulting
+        // set of triggers because of missed firing times, so we need to
+        // read the whole bunch. To avoid excessive results, we fetch the
+        // using paging.
+        var candidateTriggers = new PriorityQueue<Trigger, int>(maxCount);
 
-        // Copy the list to another list, we may need to modify it.
-        var candidateTriggers = new PriorityQueue<Trigger, int>(storedTriggers.Select(x => (x, -x.Priority)));
-
+        [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
+        async Task GetNextBunchAsync()
+        {
+            // Still some stuff to process, do not fetch from store.
+            if (candidateTriggers.Count > 0) return;
+            // If we hit the request limit, refuse to continue fetching.
+            if (session.Advanced.NumberOfRequests >= requestLimit) return;
+            
+            await GetFiringCandidatesAsync
+            (
+                session,
+                candidateTriggers,
+                upperLimit,
+                skip,
+                maxCount,
+                token
+            ).ConfigureAwait(false);
+            skip += maxCount;
+        }
+        
+        await GetNextBunchAsync().ConfigureAwait(false);
+        
         while (candidateTriggers.Count > 0 && result.Count < maxCount)
         {
             var trigger = candidateTriggers.Dequeue();
@@ -1472,14 +1487,19 @@ public partial class RavenJobStore
             if (job.Item.ThrowIfNull().ConcurrentExecutionDisallowed)
             {
                 var jobKey = new JobKey(job.Name, job.Group);
-                
-                if (acquiredJobKeysForNoConcurrentExec.Add(jobKey) == false) continue;
+
+                if (acquiredJobKeysForNoConcurrentExec.Add(jobKey) == false)
+                {
+                    await GetNextBunchAsync().ConfigureAwait(false);
+                    continue;
+                }
             }
 
             trigger.State = InternalTriggerState.Acquired;
             trigger.FireInstanceId = GetFiredTriggerRecordId();
 
             result.Add(trigger.Item.ThrowIfNull());
+            await GetNextBunchAsync().ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);

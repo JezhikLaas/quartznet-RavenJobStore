@@ -379,6 +379,30 @@ public partial class RavenJobStore
         ids.ForEach(session.Delete);
     }
     
+    private async Task GetFiringCandidatesAsync(
+        IAsyncDocumentSession session,
+        PriorityQueue<Trigger, int> buffer,
+        DateTimeOffset upperLimit,
+        int skip,
+        int count,
+        CancellationToken token)
+    {
+        var result = await (
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
+                .Include(x => x.CalendarId)
+                .Include(x => x.JobId)
+            where trigger.Scheduler == InstanceName
+                  &&
+                  trigger.State == InternalTriggerState.Waiting
+                  &&
+                  trigger.NextFireTimeUtc <= upperLimit
+            orderby trigger.NextFireTimeUtc, trigger.Priority descending
+            select trigger
+        ).Skip(skip).Take(count).ToListAsync(token).ConfigureAwait(false);
+        
+        result.ForEach(x => buffer.Enqueue(x, -x.Priority));
+    }
+
     private void WaitForIndexing()
     {
         var operationExecutor = DocumentStore!.Maintenance.ForDatabase(DocumentStore!.Database);
@@ -410,7 +434,7 @@ public partial class RavenJobStore
 
     private async Task RetryConcurrencyConflictAsync(Task action)
     {
-        var counter = 5;
+        var counter = 100;
         
         while (counter-- > 0)
         {
@@ -435,7 +459,7 @@ public partial class RavenJobStore
 
     private async Task<T> RetryConcurrencyConflictAsync<T>(Task<T> action)
     {
-        var counter = 5;
+        var counter = 100;
         
         while (counter-- > 0)
         {
