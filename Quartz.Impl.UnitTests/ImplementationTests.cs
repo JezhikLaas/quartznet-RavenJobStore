@@ -553,6 +553,72 @@ public class ImplementationTests : TestBase
             .ContainSingle(x => x.TriggerKey.Equals(new TriggerKey("Trigger", "Group")));
     }
 
+    [Fact(DisplayName = "If a trigger is added and the assigned job is blocked Then the trigger is created blocked")]
+    public async Task If_a_trigger_is_added_and_the_assigned_job_is_blocked_Then_the_trigger_is_created_blocked()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            await arrangeSession.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName,
+                    job.Key.GetDatabaseId(Target.InstanceName))
+            );
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group
+        };
+
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId(Target.InstanceName));
+
+        checkTriggers.State.Should().Be(InternalTriggerState.Blocked);
+    }
+
+    [Fact(DisplayName = "If a trigger is added and the assigned job is blocked paused Then the trigger is created blocked")]
+    public async Task If_a_trigger_is_added_and_the_assigned_job_is_blocked_paused_Then_the_trigger_is_created_blocked()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            await arrangeSession.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName,
+                    job.Key.GetDatabaseId(Target.InstanceName))
+            );
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        await Target.PauseJobsAsync(GroupMatcher<JobKey>.GroupEquals("Group"), CancellationToken.None);
+
+        var trigger = new SimpleTriggerImpl("Trigger", "Group")
+        {
+            JobName = job.Name,
+            JobGroup = job.Group
+        };
+
+        await Target.StoreTriggerAsync(trigger, false, CancellationToken.None);
+        
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var checkTriggers = await session.LoadAsync<Trigger>(trigger.Key.GetDatabaseId(Target.InstanceName));
+
+        checkTriggers.State.Should().Be(InternalTriggerState.PausedAndBlocked);
+    }
+
     [Fact(DisplayName = "If a trigger and the referenced job does not exist Then StoreTrigger will throw")]
     public async Task If_a_trigger_and_the_referenced_job_does_not_exist_Then_StoreTrigger_will_throw()
     {

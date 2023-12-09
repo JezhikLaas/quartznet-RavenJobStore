@@ -199,7 +199,7 @@ public partial class RavenJobStore
         return true;
     }
 
-    private async Task RecoverJobStoreAsync(IAsyncDocumentSession session, CancellationToken token)
+    internal async Task RecoverJobStoreAsync(IAsyncDocumentSession session, CancellationToken token)
     {
         try
         {
