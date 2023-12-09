@@ -2628,4 +2628,177 @@ public class ImplementationTests : TestBase
 
         stateOne.Should().Be(InternalTriggerState.Blocked);
     }
+
+    [Fact(DisplayName = "If two triggers fire the same non concurrent job Then only one is executed")]
+    public async void If_two_triggers_fire_the_same_non_concurrent_job_Then_only_one_is_executed()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        var result = await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+
+        result.Should()
+            .HaveCount(1).And
+            .ContainSingle
+            (
+                x => x.TriggerFiredBundle != null
+                     &&
+                     x.TriggerFiredBundle.Trigger.Description == "Expected"
+            );
+    }
+
+    [Fact(DisplayName = "If two triggers fire the same non concurrent job Then the lower one is blocked")]
+    public async void If_two_triggers_fire_the_same_non_concurrent_job_Then_the_lower_one_is_blocked()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+
+        stateOne.Should().Be(InternalTriggerState.Blocked);
+    }
+
+    [Fact(DisplayName = "If two triggers fire the same non concurrent job Then the higher one is executing")]
+    public async void If_two_triggers_fire_the_same_non_concurrent_job_Then_the_higher_one_is_executing()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Unexpected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        var triggers = await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerTwo.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+
+        stateOne.Should().Be(InternalTriggerState.Executing);
+    }
 }

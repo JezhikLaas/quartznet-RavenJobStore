@@ -10,6 +10,7 @@ internal class TriggerIndex : AbstractIndexCreationTask<Trigger>
         Map = triggers => from trigger in triggers
             select new
             {
+                trigger.Id,
                 trigger.Scheduler,
                 trigger.CalendarId,
                 trigger.JobId,

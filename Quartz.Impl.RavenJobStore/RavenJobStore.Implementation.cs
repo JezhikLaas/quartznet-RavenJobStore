@@ -699,7 +699,7 @@ public partial class RavenJobStore
             .ExistsAsync(Entities.Calendar.GetId(InstanceName, name), token)
             .ConfigureAwait(false);
 
-        if (calendarExists)
+        if (calendarExists && replaceExisting == false)
         {
             throw new ObjectAlreadyExistsException($"Calendar with name '{name}' already exists");
         }
@@ -1433,33 +1433,7 @@ public partial class RavenJobStore
         var skip = 0;
         var upperLimit = noLaterThan + timeWindow;
         var requestLimit = session.Advanced.MaxNumberOfRequestsPerSession - 2;
-
-        // Streaming would be much better here, because there may be a lot
-        // of matching candidates. But we may need to modify the resulting
-        // set of triggers because of missed firing times, so we need to
-        // read the whole bunch. To avoid excessive results, we fetch the
-        // using paging.
         var candidateTriggers = new PriorityQueue<Trigger, int>(maxCount);
-
-        [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
-        async Task GetNextBunchAsync()
-        {
-            // Still some stuff to process, do not fetch from store.
-            if (candidateTriggers.Count > 0) return;
-            // If we hit the request limit, refuse to continue fetching.
-            if (session.Advanced.NumberOfRequests >= requestLimit) return;
-            
-            await GetFiringCandidatesAsync
-            (
-                session,
-                candidateTriggers,
-                upperLimit,
-                skip,
-                maxCount,
-                token
-            ).ConfigureAwait(false);
-            skip += maxCount;
-        }
         
         await GetNextBunchAsync().ConfigureAwait(false);
         
@@ -1507,6 +1481,31 @@ public partial class RavenJobStore
         TraceExit(Logger, result);
 
         return result;
+
+        // Streaming would be much better here, because there may be a lot
+        // of matching candidates. But we may need to modify the resulting
+        // set of triggers because of missed firing times, so we need to
+        // read the whole bunch. To avoid excessive results, we fetch the
+        // using paging.
+        [SuppressMessage("ReSharper", "AccessToDisposedClosure")]
+        async Task GetNextBunchAsync()
+        {
+            // Still some stuff to process, do not fetch from store.
+            if (candidateTriggers.Count > 0) return;
+            // If we hit the request limit, refuse to continue fetching.
+            if (session.Advanced.NumberOfRequests >= requestLimit) return;
+            
+            await GetFiringCandidatesAsync
+            (
+                session,
+                candidateTriggers,
+                upperLimit,
+                skip,
+                maxCount,
+                token
+            ).ConfigureAwait(false);
+            skip += maxCount;
+        }
     }
 
     internal async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
@@ -1536,10 +1535,12 @@ public partial class RavenJobStore
         TraceExit(Logger, true);
     }
 
-    private async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFiredAsync(
+    internal async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFiredAsync(
         IEnumerable<IOperableTrigger> triggers,
         CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var result = new List<TriggerFiredResult>();
@@ -1587,7 +1588,6 @@ public partial class RavenJobStore
             {
                 var triggersToBlock = await (
                     from trigger in session.Query<Trigger>(nameof(TriggerIndex))
-                        .Include(x => x.Scheduler)
                     where trigger.JobId == storedTrigger.JobId
                           &&
                           trigger.Id != storedTrigger.Id
@@ -1609,10 +1609,15 @@ public partial class RavenJobStore
                 }
             }
 
-            await session.SaveChangesAsync(token).ConfigureAwait(false);
+            storedTrigger.State = InternalTriggerState.Executing;
+            storedTrigger.Item = operableTrigger;
 
             result.Add(new TriggerFiredResult(bundle));
         }
+
+        await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, result);
 
         return result;
     }
