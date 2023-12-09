@@ -422,7 +422,7 @@ public partial class RavenJobStore
             else break;
         }
     }
-
+    
     private async Task RetryConcurrencyConflictAsync(Task action)
     {
         var counter = 100;
@@ -474,6 +474,15 @@ public partial class RavenJobStore
         throw new Exception("Should never go here");
     }
 
+    private partial void NotifyDebugWatcher(SchedulerExecutionStep step);
+    
+    #if DEBUG
+    private partial void NotifyDebugWatcher(SchedulerExecutionStep step)
+    {
+        DebugWatcher?.Notify(step, InstanceName, InstanceId);
+    }
+    #endif
+
     [LoggerMessage(Level = LogLevel.Information, EventId = 1, Message = "Concurrency problem: {error}")]
     public static partial void LogConcurrencyProblem(ILogger logger, string error);
 
@@ -488,4 +497,9 @@ public partial class RavenJobStore
 
     [LoggerMessage(Level = LogLevel.Trace, EventId = 5, Message = "Exit {name} with {result}")]
     public static partial void TraceExit(ILogger logger, object? result, [CallerMemberName]string? name = null);
+}
+
+public interface IDebugWatcher
+{
+    void Notify(SchedulerExecutionStep step, string instanceName, string instanceId);
 }

@@ -1425,6 +1425,7 @@ public partial class RavenJobStore
         CancellationToken token)
     {
         TraceEnter(Logger);
+        NotifyDebugWatcher(SchedulerExecutionStep.Acquiring);
         
         using var session = GetSession();
 
@@ -1512,6 +1513,7 @@ public partial class RavenJobStore
     internal async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
     {
         TraceEnter(Logger);
+        NotifyDebugWatcher(SchedulerExecutionStep.Releasing);
         
         using var session = GetSession();
 
@@ -1541,6 +1543,7 @@ public partial class RavenJobStore
         CancellationToken token)
     {
         TraceEnter(Logger);
+        NotifyDebugWatcher(SchedulerExecutionStep.Firing);
         
         using var session = GetSession();
 
@@ -1630,7 +1633,8 @@ public partial class RavenJobStore
         CancellationToken token)
     {
         TraceEnter(Logger);
-        
+        NotifyDebugWatcher(SchedulerExecutionStep.Completing);
+       
         using var session = GetSession();
 
         var entry = await session
@@ -1677,39 +1681,36 @@ public partial class RavenJobStore
     {
         session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
 
-        if (job != null)
+        if (job == null) return false;
+        
+        if (jobDetail.PersistJobDataAfterExecution) job.Item = jobDetail;
+
+        if (jobDetail.ConcurrentExecutionDisallowed == false) return false;
+        
+        var triggersForJob = await (
+            from item in session.Query<Trigger>(nameof(TriggerIndex))
+            where item.JobId == job.Id
+                  &&
+                  (
+                      item.State == InternalTriggerState.Blocked
+                      ||
+                      item.State == InternalTriggerState.PausedAndBlocked
+                  )
+            select item
+        ).ToListAsync(token).ConfigureAwait(false);
+
+        foreach (var item in triggersForJob)
         {
-            if (jobDetail.PersistJobDataAfterExecution) job.Item = jobDetail;
-
-            if (jobDetail.ConcurrentExecutionDisallowed)
+            item.State = item.State switch
             {
-                var triggersForJob = await (
-                    from item in session.Query<Trigger>(nameof(TriggerIndex))
-                    where item.JobId == job.Id
-                          &&
-                          (
-                              item.State == InternalTriggerState.Blocked
-                              ||
-                              item.State == InternalTriggerState.PausedAndBlocked
-                          )
-                    select item
-                ).ToListAsync(token).ConfigureAwait(false);
-
-                foreach (var item in triggersForJob)
-                {
-                    item.State = item.State switch
-                    {
-                        InternalTriggerState.Blocked => InternalTriggerState.Waiting,
-                        InternalTriggerState.PausedAndBlocked => InternalTriggerState.Paused,
-                        _ => item.State
-                    };
-                }
-
-                return true;
-            }
+                InternalTriggerState.Blocked => InternalTriggerState.Waiting,
+                InternalTriggerState.PausedAndBlocked => InternalTriggerState.Paused,
+                _ => item.State
+            };
         }
 
-        return false;
+        return true;
+
     }
 
     private async Task<bool> ProcessTriggerInstructionAsync(

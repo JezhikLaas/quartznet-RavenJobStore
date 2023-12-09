@@ -108,4 +108,6 @@ public partial class RavenJobStore
     public int ThreadPoolSize { get; set; }
 
     internal ILogger<RavenJobStore> Logger { get; set; } = NullLoggerFactory.Instance.CreateLogger<RavenJobStore>();
+    
+    internal IDebugWatcher? DebugWatcher { get; set; }
 }
