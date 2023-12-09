@@ -1509,14 +1509,21 @@ public partial class RavenJobStore
         return result;
     }
 
-    private async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
+    internal async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
     {
+        TraceEnter(Logger);
+        
         using var session = GetSession();
 
         var storedTrigger = await session
             .LoadAsync<Trigger>(trigger.Key.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
-        if (storedTrigger is null || storedTrigger.State != InternalTriggerState.Acquired) return;
+
+        if (storedTrigger is null || storedTrigger.State != InternalTriggerState.Acquired)
+        {
+            TraceExit(Logger, false);
+            return;
+        }
 
         var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
 
@@ -1525,6 +1532,8 @@ public partial class RavenJobStore
             : InternalTriggerState.Waiting;
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
+        
+        TraceExit(Logger, true);
     }
 
     private async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFiredAsync(

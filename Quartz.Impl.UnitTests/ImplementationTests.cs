@@ -2515,4 +2515,117 @@ public class ImplementationTests : TestBase
             .HaveCount(2).And
             .BeInDescendingOrder(x => x.Priority);
     }
+
+    [Fact(DisplayName = "If an acquired trigger is released Then it gets back to waiting")]
+    public async Task If_an_acquired_trigger_is_released_Then_it_gets_back_to_waiting()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger2", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(5)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        triggerTwo.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+        await Target.StoreTriggerAsync
+        (
+            triggerTwo,
+            false,
+            CancellationToken.None
+        );
+
+        await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        await Target.ReleaseAcquiredTriggerAsync(triggerOne, CancellationToken.None);
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+        
+        var storedTriggerTwo = await session.LoadAsync<Trigger>(triggerTwo.Key.GetDatabaseId(Target.InstanceName));
+        var stateTwo = storedTriggerTwo.State; 
+
+        stateOne.Should().Be(InternalTriggerState.Waiting);
+        stateTwo.Should().Be(InternalTriggerState.Acquired);
+    }
+
+    [Fact(DisplayName = "If an acquired and blocked trigger is released Then it gets back to blocked")]
+    public async Task If_an_acquired_and_blocked_trigger_is_released_Then_it_gets_back_to_blocked()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger1", "Group")
+            .StartNow()
+            .WithDescription("Expected")
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        triggerOne.ComputeFirstFireTimeUtc(null);
+        
+        await Target.StoreTriggerAsync
+        (
+            triggerOne,
+            false,
+            CancellationToken.None
+        );
+
+        await Target.AcquireNextTriggersAsync
+        (
+            DateTimeOffset.UtcNow,
+            2,
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None
+        );
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            await arrangeSession.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName))
+            );
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        await Target.ReleaseAcquiredTriggerAsync(triggerOne, CancellationToken.None);
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        
+        var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
+        var stateOne = storedTriggerOne.State;
+
+        stateOne.Should().Be(InternalTriggerState.Blocked);
+    }
 }

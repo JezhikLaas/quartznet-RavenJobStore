@@ -225,10 +225,6 @@ public partial class RavenJobStore
             await DeleteCompletedTriggersAsync(session, inconsistentTriggers, token).ConfigureAwait(false);
             await RestartTriggersForRecoveringJobsAsync(session, token).ConfigureAwait(false);
 
-            var scheduler = await session
-                .LoadAsync<Scheduler>(InstanceName, token)
-                .ConfigureAwait(false);
-            
             await session.SaveChangesAsync(token).ConfigureAwait(false);
         }
         catch (Exception error)
@@ -324,11 +320,6 @@ public partial class RavenJobStore
             trigger.JobGroup,
             token
         ).ConfigureAwait(false);
-
-        var scheduler =
-        (
-            await session.LoadAsync<Scheduler>(InstanceName, token).ConfigureAwait(false)
-        ).ThrowIfNull();
 
         var isJobBlocked = await IsJobBlockedAsync
         (
