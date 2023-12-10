@@ -19,7 +19,7 @@ public class SingleSchedulerTests : SchedulerTestBase
     [Fact(DisplayName = "If a scheduler is created with type raven Then a RavenJobStore gets instantiated")]
     public async Task If_a_scheduler_is_created_with_type_raven_Then_a_RavenJobStore_gets_instantiated()
     {
-        Scheduler = await CreateScheduler("Test");
+        Scheduler = await CreateSingleSchedulerAsync("Test");
         await Scheduler.Start();
         
         var ravenJobStore = GetStore(Scheduler);
@@ -29,7 +29,7 @@ public class SingleSchedulerTests : SchedulerTestBase
     [Fact(DisplayName = "If a collection name is used Then documents are placed within it")]
     public async Task If_a_collection_name_is_used_Then_documents_are_placed_within_it()
     {
-        Scheduler = await CreateScheduler("Test", collectionName: "SchedulerData");
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
         await Scheduler.Start();
         
         using var session = DocumentStore.OpenAsyncSession();
