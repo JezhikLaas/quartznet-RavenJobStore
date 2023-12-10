@@ -15,6 +15,8 @@ public class ClusteredSchedulerTests : SchedulerTestBase
         }
 
         base.Dispose();
+        
+        GC.SuppressFinalize(this);
     }
 
     [Fact(DisplayName = "If multiple schedulers are started Then every scheduler has its own job store")]

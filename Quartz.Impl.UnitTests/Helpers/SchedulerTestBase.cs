@@ -27,15 +27,15 @@ public abstract class SchedulerTestBase : TestBase
         string name,
         int threadCount = 5,
         string? collectionName = null) =>
-        CreateSchedulerAsync(CreateSingleProperties(name, threadCount, collectionName));
+        CreateScheduler(CreateSingleProperties(name, threadCount, collectionName));
 
     protected Task<IScheduler> CreateClusteredSchedulerAsync(
         string name,
         int threadCount = 5,
         string? collectionName = null) =>
-        CreateSchedulerAsync(CreateClusteredProperties(name, threadCount, collectionName));
+        CreateScheduler(CreateClusteredProperties(name, threadCount, collectionName));
 
-    private Task<IScheduler> CreateSchedulerAsync(NameValueCollection properties)
+    private Task<IScheduler> CreateScheduler(NameValueCollection properties)
     {
         var schedulerFactory = new TestSchedulerFactory(properties);
         return schedulerFactory.GetScheduler();
@@ -53,11 +53,7 @@ public abstract class SchedulerTestBase : TestBase
             collectionName
         );
 
-        // To force a unique instance id event on lightning fast super computers
-        Thread.Sleep(10);
-        
         properties.Add("quartz.jobStore.clustered", "true");
-        properties["quartz.scheduler.instanceId"] = $"CLUSTER{DateTime.Now.Ticks}";
 
         return properties;
     }
@@ -86,7 +82,7 @@ public abstract class SchedulerTestBase : TestBase
     /// This is only for testing - never try to use something like this in production code.
     /// </summary>
     /// <returns></returns>
-    protected RavenJobStore.RavenJobStore GetStore(IScheduler scheduler)
+    protected static RavenJobStore.RavenJobStore GetStore(IScheduler scheduler)
     {
         var realSchedulerField = scheduler
             .GetType()
@@ -100,27 +96,5 @@ public abstract class SchedulerTestBase : TestBase
         var resources = (QuartzSchedulerResources)resourcesField!.GetValue(realScheduler)!;
 
         return (RavenJobStore.RavenJobStore)resources.JobStore;
-    }
-}
-
-public class TestSchedulerFactory : StdSchedulerFactory
-{
-    public TestSchedulerFactory(NameValueCollection properties)
-        : base(properties)
-    { }
-    
-    public override async Task<IScheduler> GetScheduler(CancellationToken cancellationToken = new CancellationToken())
-    {
-        var instantiateMethod = typeof(StdSchedulerFactory).GetMethod
-        (
-            "Instantiate",
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            Type.EmptyTypes
-        );
-
-        var task = (Task<IScheduler>)instantiateMethod!.Invoke(this, null)!;
-        await task.ConfigureAwait(false);
-        
-        return task.Result;
     }
 }

@@ -23,3 +23,8 @@ profile:
 linter: jetbrains/qodana-dotnet:2023.3-eap
 include:
   - name: InvertIf
+  - name: ArrangeObjectCreationWhenTypeEvident
+  - name: CA1822
+  - name: CA1816
+  - name: MemberCanBeMadeStatic.Global
+  - name: MemberCanBeMadeStatic.Local
