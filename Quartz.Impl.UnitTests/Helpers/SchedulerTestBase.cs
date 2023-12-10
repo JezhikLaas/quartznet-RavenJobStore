@@ -35,7 +35,7 @@ public abstract class SchedulerTestBase : TestBase
         string? collectionName = null) =>
         CreateScheduler(CreateClusteredProperties(name, threadCount, collectionName));
 
-    private Task<IScheduler> CreateScheduler(NameValueCollection properties)
+    private static Task<IScheduler> CreateScheduler(NameValueCollection properties)
     {
         var schedulerFactory = new TestSchedulerFactory(properties);
         return schedulerFactory.GetScheduler();
