@@ -4,7 +4,7 @@
 
 
 # Quartz.NET-RavenJobStore
-Not exactly a fork of inspired by [Quartz.NET-RavenDB](https://github.com/ravendb/quartznet-RavenDB)
+Not exactly a fork of, but inspired by [Quartz.NET-RavenDB](https://github.com/ravendb/quartznet-RavenDB)
 
 Under development, no release yet.
 
