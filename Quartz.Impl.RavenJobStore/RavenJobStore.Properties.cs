@@ -63,6 +63,12 @@ public partial class RavenJobStore
     [JsonProperty]
     internal IDocumentStore? DocumentStore { get; set; }
 
+    /// <summary>
+    /// The collection name to be used for scheduler data. />.
+    /// </summary>
+    [JsonProperty]
+    public string? CollectionName { get; set; }
+
     // ReSharper disable once UnusedMember.Global
     protected static DateTimeOffset MisfireTime
     {

@@ -9,6 +9,7 @@ using Quartz.Impl.RavenJobStore.Indexes;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
+using Raven.Client.Documents.Conventions;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
 
@@ -21,23 +22,28 @@ namespace Quartz.Impl.RavenJobStore;
 
 public partial class RavenJobStore
 {
-    internal static RavenJobStore? Instance;
+    //internal static RavenJobStore? Instance;
 
     public RavenJobStore()
-    {
-        Instance = this;
-    }
+    { }
 
     public RavenJobStore(IDocumentStore store)
     {
-        Instance = this;
         DocumentStore = store;
     }
 
     internal IDocumentStore InitializeDocumentStore()
     {
+        var conventions = new DocumentConventions
+        {
+            UseOptimisticConcurrency = true,
+            FindCollectionName = x => string.IsNullOrEmpty(CollectionName)
+                ? DocumentConventions.DefaultGetCollectionName(x)
+                : CollectionName
+        };
         var store = new DocumentStore
         {
+            Conventions = conventions,
             Urls = RavenNodes,
             Database = Database,
             Certificate = string.IsNullOrEmpty(CertificatePath)

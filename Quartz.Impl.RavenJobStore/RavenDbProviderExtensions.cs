@@ -42,16 +42,22 @@ public static class RavenDbProviderExtensions
     public static void UseRavenJobStoreLogging(this IApplicationBuilder builder)
     {
         var factory = builder.ApplicationServices.GetService<ILoggerFactory>();
+        if (factory == null) return;
 
-        if (factory == null || RavenJobStore.Instance == null) return;
-        RavenJobStore.Instance.Logger = new Logger<RavenJobStore>(factory);
+        if (builder.ApplicationServices.GetService<IJobStore>() is RavenJobStore store)
+        {
+            store.Logger = new Logger<RavenJobStore>(factory);
+        }
     }
 
     public static void UseRavenJobStoreLogging(this IHost host)
     {
         var factory = host.Services.GetService<ILoggerFactory>();
+        if (factory == null) return;
 
-        if (factory == null || RavenJobStore.Instance == null) return;
-        RavenJobStore.Instance.Logger = new Logger<RavenJobStore>(factory);
+        if (host.Services.GetService<IJobStore>() is RavenJobStore store)
+        {
+            store.Logger = new Logger<RavenJobStore>(factory);
+        }
     }
 }

@@ -46,4 +46,13 @@ public class RavenDbProviderOptions
     {
         set => _options.SetProperty("quartz.jobStore.certPass", value);
     }
+
+    /// <summary>
+    ///     Optional collection name to store all scheduler data in.
+    /// </summary>
+    // ReSharper disable once UnusedMember.Global
+    public string CollectionName
+    {
+        set => _options.SetProperty("quartz.jobStore.collectionName", value);
+    }
 }
