@@ -1,4 +1,4 @@
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.UnitTests.Jobs;
 
 [DisallowConcurrentExecution]
 public class NonConcurrentJob : IJob

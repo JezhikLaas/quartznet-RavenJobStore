@@ -2,6 +2,7 @@ using FluentAssertions;
 using Newtonsoft.Json;
 using Quartz.Impl.Calendar;
 using Quartz.Impl.Triggers;
+using Quartz.Impl.UnitTests.Helpers;
 using Quartz.Spi;
 using Xunit.Abstractions;
 

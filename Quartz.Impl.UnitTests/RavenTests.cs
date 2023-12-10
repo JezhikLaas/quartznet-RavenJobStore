@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Newtonsoft.Json;
+using Quartz.Impl.UnitTests.Helpers;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 

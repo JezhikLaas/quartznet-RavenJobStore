@@ -4,6 +4,8 @@ using Quartz.Impl.Calendar;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.Triggers;
+using Quartz.Impl.UnitTests.Helpers;
+using Quartz.Impl.UnitTests.Jobs;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;

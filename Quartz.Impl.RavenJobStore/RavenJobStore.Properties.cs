@@ -103,12 +103,13 @@ public partial class RavenJobStore
 
     public long EstimatedTimeToReleaseAndAcquireTrigger => 100;
 
-    public bool Clustered => false;
+    [JsonProperty]
+    public bool Clustered { get; set; }
 
     [JsonProperty]
-    public string InstanceId { get; set; } = "instance_two";
+    public string InstanceId { get; set; } = "InstanceId";
 
-    public string InstanceName { get; set; } = "UnitTestScheduler";
+    public string InstanceName { get; set; } = "InstanceName";
 
     [JsonProperty]
     public int ThreadPoolSize { get; set; }

@@ -1,9 +1,9 @@
 using Raven.Client.Documents;
 using Raven.TestDriver;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.UnitTests.Helpers;
 
-public class TestBase : RavenTestDriver
+public abstract class TestBase : RavenTestDriver
 {
     static TestBase()
     {
