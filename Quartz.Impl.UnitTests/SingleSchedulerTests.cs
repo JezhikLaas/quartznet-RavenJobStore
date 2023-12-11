@@ -74,11 +74,11 @@ public class SingleSchedulerTests : SchedulerTestBase
             existingJobs = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
         }
 
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Acquiring, A<string>._, A<string>._))
+        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Acquiring, A<string>._))
             .MustHaveHappened();
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Firing, A<string>._, A<string>._))
+        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Firing, A<string>._))
             .MustHaveHappenedOnceExactly();
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Completing, A<string>._, A<string>._))
+        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Completing, A<string>._))
             .MustHaveHappenedOnceExactly();
     }
     

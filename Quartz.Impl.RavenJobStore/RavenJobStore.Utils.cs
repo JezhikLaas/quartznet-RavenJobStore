@@ -495,7 +495,7 @@ public partial class RavenJobStore
     #if DEBUG
     private partial void NotifyDebugWatcher(SchedulerExecutionStep step)
     {
-        DebugWatcher?.Notify(step, InstanceName, InstanceId);
+        DebugWatcher?.Notify(step, InstanceId);
     }
     #endif
 
@@ -517,5 +517,5 @@ public partial class RavenJobStore
 
 public interface IDebugWatcher
 {
-    void Notify(SchedulerExecutionStep step, string instanceName, string instanceId);
+    void Notify(SchedulerExecutionStep step, string instanceId);
 }

@@ -28,3 +28,4 @@ include:
   - name: CA1816
   - name: MemberCanBeMadeStatic.Global
   - name: MemberCanBeMadeStatic.Local
+  - name: UnusedParameter.Global
