@@ -129,7 +129,7 @@ public partial class RavenJobStore
     private static string GetFiredTriggerRecordId()
     {
         var value = Interlocked.Increment(ref _fireTimeCounter);
-        return $"{value:D18}";
+        return $"{value:D19}";
     }
 
     private async Task SetAllTriggersOfJobToStateAsync(
@@ -369,6 +369,22 @@ public partial class RavenJobStore
         
         ids.ForEach(session.Delete);
     }
+
+    private async Task DeleteJobIfSingleReferenceAsync(IAsyncDocumentSession session, string jobId, string triggerId)
+    {
+        var otherTriggers = await (
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
+            where trigger.Scheduler == InstanceName
+                  &&
+                  trigger.JobId == jobId
+                  &&
+                  trigger.Id != triggerId
+            select trigger
+        ).AnyAsync().ConfigureAwait(false);
+        
+        if (otherTriggers == false) session.Delete(jobId);
+    }
+
     
     private async Task GetFiringCandidatesAsync(
         IAsyncDocumentSession session,
@@ -423,7 +439,7 @@ public partial class RavenJobStore
         }
     }
     
-    private async Task RetryConcurrencyConflictAsync(Task action)
+    private async Task RetryConcurrencyConflictAsync(Func<Task> action)
     {
         var counter = 100;
         
@@ -431,7 +447,7 @@ public partial class RavenJobStore
         {
             try
             {
-                await action.ConfigureAwait(false);
+                await action().ConfigureAwait(false);
                 return;
             }
             catch (ConcurrencyException error)
@@ -448,7 +464,7 @@ public partial class RavenJobStore
         }
     }
 
-    private async Task<T> RetryConcurrencyConflictAsync<T>(Task<T> action)
+    private async Task<T> RetryConcurrencyConflictAsync<T>(Func<Task<T>> action)
     {
         var counter = 100;
         
@@ -456,7 +472,7 @@ public partial class RavenJobStore
         {
             try
             {
-                return await action.ConfigureAwait(false);
+                return await action().ConfigureAwait(false);
             }
             catch (ConcurrencyException error)
             {

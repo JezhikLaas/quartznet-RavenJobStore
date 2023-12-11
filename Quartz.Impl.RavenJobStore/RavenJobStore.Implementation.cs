@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -39,7 +40,7 @@ public partial class RavenJobStore
             UseOptimisticConcurrency = true,
             FindCollectionName = x => string.IsNullOrEmpty(CollectionName)
                 ? DocumentConventions.DefaultGetCollectionName(x)
-                : CollectionName
+                : CollectionName + "/" + DocumentConventions.DefaultGetCollectionName(x)
         };
         var store = new DocumentStore
         {
@@ -1431,7 +1432,6 @@ public partial class RavenJobStore
         CancellationToken token)
     {
         TraceEnter(Logger);
-        NotifyDebugWatcher(SchedulerExecutionStep.Acquiring);
         
         using var session = GetSession();
 
@@ -1519,7 +1519,6 @@ public partial class RavenJobStore
     internal async Task ReleaseAcquiredTriggerAsync(IMutableTrigger trigger, CancellationToken token)
     {
         TraceEnter(Logger);
-        NotifyDebugWatcher(SchedulerExecutionStep.Releasing);
         
         using var session = GetSession();
 
@@ -1545,11 +1544,10 @@ public partial class RavenJobStore
     }
 
     internal async Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFiredAsync(
-        IEnumerable<IOperableTrigger> triggers,
+        IReadOnlyCollection<IOperableTrigger> triggers,
         CancellationToken token)
     {
         TraceEnter(Logger);
-        NotifyDebugWatcher(SchedulerExecutionStep.Firing);
         
         using var session = GetSession();
 
@@ -1568,6 +1566,14 @@ public partial class RavenJobStore
         foreach (var (_, storedTrigger) in storedTriggers)
         {
             if (storedTrigger?.State != InternalTriggerState.Acquired) continue;
+            var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
+            if (isJobBlocked)
+            {
+                // This should force Quartz to release this
+                // trigger and do the next round of processing.
+                result.Add(new TriggerFiredResult(new RavenDbException("Job is blocked")));
+                continue;
+            }
 
             var calendar = await session
                 .LoadAsync<Entities.Calendar>(storedTrigger.CalendarId, token)
@@ -1581,6 +1587,14 @@ public partial class RavenJobStore
                 .LoadAsync<Job>(storedTrigger.JobId, token)
                 .ConfigureAwait(false);
 
+            if (storedJob == null)
+            {
+                // This should force Quartz to release this
+                // trigger and do the next round of processing.
+                result.Add(new TriggerFiredResult(new RavenDbException("Job has been deleted")));
+                continue;
+            }
+
             var jobDetail = storedJob.Item.ThrowIfNull();
 
             var bundle = new TriggerFiredBundle(
@@ -1593,7 +1607,7 @@ public partial class RavenJobStore
                 previousFireTime,
                 operableTrigger.GetNextFireTimeUtc()
             );
-
+            
             if (jobDetail.ConcurrentExecutionDisallowed)
             {
                 var triggersToBlock = await (
@@ -1612,17 +1626,22 @@ public partial class RavenJobStore
                         InternalTriggerState.Paused => InternalTriggerState.PausedAndBlocked,
                         _ => trigger.State
                     };
-
-                    await session
-                        .StoreAsync(new BlockedJob(InstanceName, trigger.JobId), token)
-                        .ConfigureAwait(false);
                 }
+
+                await session
+                    .StoreAsync(new BlockedJob(InstanceName, storedTrigger.JobId), token)
+                    .ConfigureAwait(false);
             }
 
             storedTrigger.State = InternalTriggerState.Executing;
             storedTrigger.Item = operableTrigger;
 
             result.Add(new TriggerFiredResult(bundle));
+        }
+
+        if (result.Count < triggers.Count)
+        {
+            throw new SchedulerException("Unable to put all requested triggers into executing state");
         }
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
@@ -1639,7 +1658,6 @@ public partial class RavenJobStore
         CancellationToken token)
     {
         TraceEnter(Logger);
-        NotifyDebugWatcher(SchedulerExecutionStep.Completing);
        
         using var session = GetSession();
 
@@ -1739,19 +1757,35 @@ public partial class RavenJobStore
             case SchedulerInstruction.DeleteTrigger:
             {
                 // Deleting triggers
+                var triggerId = mutableTrigger.Key.GetDatabaseId(InstanceName);
                 var nextFireTime = mutableTrigger.GetNextFireTimeUtc();
                 if (nextFireTime.HasValue == false)
                 {
                     nextFireTime = trigger.NextFireTimeUtc;
                     if (nextFireTime.HasValue == false)
                     {
-                        session.Delete(mutableTrigger.Key.GetDatabaseId(InstanceName));
+                        session.Delete(triggerId);
+
+                        await DeleteJobIfSingleReferenceAsync
+                        (
+                            session,
+                            mutableTrigger.JobKey.GetDatabaseId(InstanceName),
+                            triggerId
+                        ).ConfigureAwait(false);
                     }
 
                     return false;
                 }
 
-                session.Delete(mutableTrigger.Key.GetDatabaseId(InstanceName));
+                session.Delete(triggerId);
+
+                await DeleteJobIfSingleReferenceAsync
+                (
+                    session,
+                    mutableTrigger.JobKey.GetDatabaseId(InstanceName),
+                    triggerId
+                ).ConfigureAwait(false);
+                
                 return true;
             }
             
@@ -1787,4 +1821,11 @@ public partial class RavenJobStore
                 throw new UnreachableException("Unexpected case");
         }
     }
+}
+
+public class RavenDbException : DbException
+{
+    public RavenDbException(string message)
+        : base(message)
+    { }
 }

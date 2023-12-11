@@ -32,7 +32,7 @@ internal class Trigger : SerializeQuartzData
         JobDataMap = trigger.JobDataMap.WrappedMap;
         MisfireInstruction = trigger.MisfireInstruction;
         Priority = trigger.Priority;
-        FireInstanceId = trigger.FireInstanceId;
+        FireInstanceIdInternal = trigger.FireInstanceId;
         NextFireTimeUtc = trigger.GetNextFireTimeUtc();
     }
 
@@ -41,6 +41,9 @@ internal class Trigger : SerializeQuartzData
     
     public TriggerKey TriggerKey => 
         new(Name, Group);
+
+    [JsonProperty(PropertyName = nameof(FireInstanceId))]
+    private string? FireInstanceIdInternal { get; set; }
 
     [JsonProperty]
     public string Name { get; set; } = string.Empty;
@@ -77,8 +80,21 @@ internal class Trigger : SerializeQuartzData
     [JsonProperty]
     public IDictionary<string, object>? JobDataMap { get; set; }
 
-    [JsonProperty]
-    public string FireInstanceId { get; set; } = string.Empty;
+    [JsonIgnore]
+    public string? FireInstanceId
+    {
+        get => FireInstanceIdInternal;
+        set
+        {
+            var operable = Item;
+            if (operable != null)
+            {
+                operable.FireInstanceId = value ?? string.Empty;
+                FireInstanceIdInternal = value;
+                QuartzData = Serialize(operable);
+            }
+        }
+    }
     
     [JsonProperty]
     public int MisfireInstruction { get; set; }

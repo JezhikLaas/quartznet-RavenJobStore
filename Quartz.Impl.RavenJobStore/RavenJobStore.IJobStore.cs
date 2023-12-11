@@ -27,21 +27,21 @@ public partial class RavenJobStore : IJobStore
     public Task SchedulerPaused(CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            SetSchedulerStateAsync(SchedulerState.Paused, cancellationToken)
+            () => SetSchedulerStateAsync(SchedulerState.Paused, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task SchedulerResumed(CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            SetSchedulerStateAsync(SchedulerState.Resumed, cancellationToken)
+            () => SetSchedulerStateAsync(SchedulerState.Resumed, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task Shutdown(CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            SetSchedulerStateAsync(SchedulerState.Shutdown, cancellationToken)
+            () => SetSchedulerStateAsync(SchedulerState.Shutdown, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -51,7 +51,7 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            StoreJobAndTriggerAsync(newJob, newTrigger, cancellationToken)
+            () => StoreJobAndTriggerAsync(newJob, newTrigger, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -66,7 +66,7 @@ public partial class RavenJobStore : IJobStore
     public Task StoreJob(IJobDetail newJob, bool replaceExisting, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            StoreJobAsync(newJob, replaceExisting, cancellationToken)
+            () => StoreJobAsync(newJob, replaceExisting, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -85,14 +85,16 @@ public partial class RavenJobStore : IJobStore
     public Task<bool> RemoveJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RemoveJobAsync(jobKey, cancellationToken)
+            () => RemoveJobAsync(jobKey, cancellationToken)
         );
 
     /// <inheritdoc />
-    public Task<bool> RemoveJobs(IReadOnlyCollection<JobKey> jobKeys, CancellationToken cancellationToken = new()) =>
+    public Task<bool> RemoveJobs(
+        IReadOnlyCollection<JobKey> jobKeys,
+        CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RemoveJobsAsync(jobKeys, cancellationToken)
+            () => RemoveJobsAsync(jobKeys, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -106,14 +108,14 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            StoreTriggerAsync(newTrigger, replaceExisting, cancellationToken)
+            () => StoreTriggerAsync(newTrigger, replaceExisting, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task<bool> RemoveTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RemoveTriggerAsync(triggerKey, cancellationToken)
+            () => RemoveTriggerAsync(triggerKey, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -122,7 +124,7 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RemoveTriggersAsync(triggerKeys, cancellationToken)
+            () => RemoveTriggersAsync(triggerKeys, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -132,7 +134,7 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ReplaceTriggerAsync(triggerKey, newTrigger, cancellationToken)
+            () => ReplaceTriggerAsync(triggerKey, newTrigger, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -157,7 +159,7 @@ public partial class RavenJobStore : IJobStore
     public Task ClearAllSchedulingData(CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ClearAllSchedulingDataAsync(cancellationToken)
+            () => ClearAllSchedulingDataAsync(cancellationToken)
         );
 
     /// <inheritdoc />
@@ -169,7 +171,7 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            StoreCalendarAsync
+            () => StoreCalendarAsync
             (
                 name,
                 calendar,
@@ -183,14 +185,14 @@ public partial class RavenJobStore : IJobStore
     public Task<bool> RemoveCalendar(string calName, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RemoveCalendarAsync(calName, cancellationToken)
+            () => RemoveCalendarAsync(calName, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task<ICalendar?> RetrieveCalendar(string calName, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            RetrieveCalendarAsync(calName, cancellationToken)
+            () => RetrieveCalendarAsync(calName, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -245,14 +247,14 @@ public partial class RavenJobStore : IJobStore
     public Task ResetTriggerFromErrorState(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResetTriggerFromErrorStateAsync(triggerKey,cancellationToken)
+            () => ResetTriggerFromErrorStateAsync(triggerKey,cancellationToken)
         );
 
     /// <inheritdoc />
     public Task PauseTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            PauseTriggerAsync(triggerKey, cancellationToken)
+            () => PauseTriggerAsync(triggerKey, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -261,14 +263,14 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            PauseTriggersAsync(matcher, cancellationToken)
+            () => PauseTriggersAsync(matcher, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task PauseJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            PauseJobAsync(jobKey, cancellationToken)
+            () => PauseJobAsync(jobKey, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -277,14 +279,14 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            PauseJobsAsync(matcher, cancellationToken)
+            () => PauseJobsAsync(matcher, cancellationToken)
         );
 
     /// <inheritdoc />
     public Task ResumeTrigger(TriggerKey triggerKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResumeTriggerAsync(triggerKey, cancellationToken)
+            () => ResumeTriggerAsync(triggerKey, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -293,7 +295,7 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResumeTriggersAsync(matcher, cancellationToken)
+            () => ResumeTriggersAsync(matcher, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -305,7 +307,7 @@ public partial class RavenJobStore : IJobStore
     public Task ResumeJob(JobKey jobKey, CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResumeJobAsync(jobKey, cancellationToken)
+            () => ResumeJobAsync(jobKey, cancellationToken)
         );
 
     /// <inheritdoc />
@@ -314,23 +316,21 @@ public partial class RavenJobStore : IJobStore
         CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResumeJobsAsync(matcher, cancellationToken)
+            () => ResumeJobsAsync(matcher, cancellationToken)
         );
 
     /// <inheritdoc />
-    public async Task PauseAll(CancellationToken cancellationToken = new())
-    {
-        await RetryConcurrencyConflictAsync
+    public Task PauseAll(CancellationToken cancellationToken = new()) =>
+        RetryConcurrencyConflictAsync
         (
-            PauseTriggersAsync(GroupMatcher<TriggerKey>.AnyGroup(), cancellationToken)
-        ).ConfigureAwait(false);
-    }
+            () => PauseTriggersAsync(GroupMatcher<TriggerKey>.AnyGroup(), cancellationToken)
+        );
 
     /// <inheritdoc />
     public Task ResumeAll(CancellationToken cancellationToken = new()) =>
         RetryConcurrencyConflictAsync
         (
-            ResumeAllTriggersAsync(cancellationToken)
+            () => ResumeAllTriggersAsync(cancellationToken)
         );
 
     /// <inheritdoc />
@@ -338,10 +338,12 @@ public partial class RavenJobStore : IJobStore
         DateTimeOffset noLaterThan,
         int maxCount,
         TimeSpan timeWindow,
-        CancellationToken cancellationToken = new()) =>
-        RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new())
+    {
+        NotifyDebugWatcher(SchedulerExecutionStep.Acquiring);
+        return RetryConcurrencyConflictAsync
         (
-            AcquireNextTriggersAsync
+            () => AcquireNextTriggersAsync
             (
                 noLaterThan,
                 maxCount,
@@ -349,32 +351,41 @@ public partial class RavenJobStore : IJobStore
                 cancellationToken
             )
         );
+    }
 
     /// <inheritdoc />
-    public Task ReleaseAcquiredTrigger(IOperableTrigger trigger, CancellationToken cancellationToken = new()) =>
-        RetryConcurrencyConflictAsync
+    public Task ReleaseAcquiredTrigger(IOperableTrigger trigger, CancellationToken cancellationToken = new())
+    {
+        NotifyDebugWatcher(SchedulerExecutionStep.Releasing);
+        return RetryConcurrencyConflictAsync
         (
-            ReleaseAcquiredTriggerAsync(trigger, cancellationToken)
+            () => ReleaseAcquiredTriggerAsync(trigger, cancellationToken)
         );
+    }
 
     /// <inheritdoc />
     public Task<IReadOnlyCollection<TriggerFiredResult>> TriggersFired(
         IReadOnlyCollection<IOperableTrigger> triggers,
-        CancellationToken cancellationToken = new()) =>
-        RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new())
+    {
+        NotifyDebugWatcher(SchedulerExecutionStep.Firing);
+        return RetryConcurrencyConflictAsync
         (
-            TriggersFiredAsync(triggers, cancellationToken)
+            () => TriggersFiredAsync(triggers, cancellationToken)
         );
+    }
 
     /// <inheritdoc />
     public Task TriggeredJobComplete(
         IOperableTrigger trigger,
         IJobDetail jobDetail,
         SchedulerInstruction triggerInstCode,
-        CancellationToken cancellationToken = new()) =>
-        RetryConcurrencyConflictAsync
+        CancellationToken cancellationToken = new())
+    {
+        NotifyDebugWatcher(SchedulerExecutionStep.Completing);
+        return RetryConcurrencyConflictAsync
         (
-            TriggeredJobCompleteAsync
+            () => TriggeredJobCompleteAsync
             (
                 trigger,
                 jobDetail,
@@ -382,4 +393,5 @@ public partial class RavenJobStore : IJobStore
                 cancellationToken
             )
         );
+    }
 }

@@ -1,4 +1,3 @@
-using FakeItEasy;
 using FluentAssertions;
 using Quartz.Impl.Calendar;
 using Quartz.Impl.Matchers;
@@ -3109,73 +3108,35 @@ public class ImplementationTests : TestBase
             .AllSatisfy(x => x.State.Should().Be(expected));
     }
 
-    [Fact(DisplayName = "If a DebugWatcher is set Then it gets notified")]
-    public async Task If_a_DebugWatcher_is_set_Then_it_gets_notified()
+    [Fact(DisplayName = "If jobs are present Then GetJobKeys returns their keys")]
+    public async Task If_jobs_are_present_Then_GetJobKeys_returns_their_keys()
     {
-        var watcher = A.Fake<IDebugWatcher>();
-        
         await Target.SchedulerStartedAsync(CancellationToken.None);
-        Target.DebugWatcher = watcher;
 
-        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        var job = new JobDetailImpl("JobOne", "Group", typeof(NonConcurrentJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+       
+
+        job = new JobDetailImpl("JobTwo", "Group", typeof(NonConcurrentJob));
         await Target.StoreJobAsync(job, false, CancellationToken.None);
 
-        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
-            .WithIdentity("Trigger1", "Group")
-            .StartNow()
-            .WithDescription("Unexpected")
-            .WithPriority(1)
-            .ForJob(job)
-            .Build();
-        var triggerTwo = (IOperableTrigger)TriggerBuilder.Create()
-            .WithIdentity("Trigger2", "Group")
-            .StartNow()
-            .WithDescription("Expected")
-            .WithPriority(5)
-            .ForJob(job)
-            .Build();
+        var jobKeys = await Target.GetJobKeysAsync(GroupMatcher<JobKey>.AnyGroup(), CancellationToken.None);
+        var checkKeys = jobKeys.OrderBy(x => x.Name).ToList();
 
-        triggerOne.ComputeFirstFireTimeUtc(null);
-        triggerTwo.ComputeFirstFireTimeUtc(null);
-        
-        await Target.StoreTriggerAsync
-        (
-            triggerOne,
-            false,
-            CancellationToken.None
-        );
-        await Target.StoreTriggerAsync
-        (
-            triggerTwo,
-            false,
-            CancellationToken.None
-        );
-
-        var triggers = await Target.AcquireNextTriggersAsync
-        (
-            DateTimeOffset.UtcNow,
-            2,
-            TimeSpan.FromMinutes(1),
-            CancellationToken.None
-        );
-
-        await Target.TriggersFiredAsync(triggers, CancellationToken.None);
-        await Target.ReleaseAcquiredTriggerAsync(triggerOne, CancellationToken.None);
-        await Target.TriggeredJobCompleteAsync
-        (
-            triggerTwo,
-            job,
-            SchedulerInstruction.NoInstruction,
-            CancellationToken.None
-        );
-
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Acquiring, A<string>._, A<string>._))
-            .MustHaveHappenedOnceExactly();
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Releasing, A<string>._, A<string>._))
-            .MustHaveHappenedOnceExactly();
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Firing, A<string>._, A<string>._))
-            .MustHaveHappenedOnceExactly();
-        A.CallTo(() => watcher.Notify(SchedulerExecutionStep.Completing, A<string>._, A<string>._))
-            .MustHaveHappenedOnceExactly();
+        checkKeys.Should()
+            .HaveCount(2).And
+            .SatisfyRespectively
+            (
+                first =>
+                {
+                    first.Name.Should().Be("JobOne");
+                    first.Group.Should().Be("Group");
+                },
+                first =>
+                {
+                    first.Name.Should().Be("JobTwo");
+                    first.Group.Should().Be("Group");
+                }
+            );
     }
 }
