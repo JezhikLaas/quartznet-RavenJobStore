@@ -1762,17 +1762,16 @@ public partial class RavenJobStore
                 if (nextFireTime.HasValue == false)
                 {
                     nextFireTime = trigger.NextFireTimeUtc;
-                    if (nextFireTime.HasValue == false)
-                    {
-                        session.Delete(triggerId);
+                    if (nextFireTime.HasValue) return false;
+                    
+                    session.Delete(triggerId);
 
-                        await DeleteJobIfSingleReferenceAsync
-                        (
-                            session,
-                            mutableTrigger.JobKey.GetDatabaseId(InstanceName),
-                            triggerId
-                        ).ConfigureAwait(false);
-                    }
+                    await DeleteJobIfSingleReferenceAsync
+                    (
+                        session,
+                        mutableTrigger.JobKey.GetDatabaseId(InstanceName),
+                        triggerId
+                    ).ConfigureAwait(false);
 
                     return false;
                 }

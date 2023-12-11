@@ -87,12 +87,11 @@ internal class Trigger : SerializeQuartzData
         set
         {
             var operable = Item;
-            if (operable != null)
-            {
-                operable.FireInstanceId = value ?? string.Empty;
-                FireInstanceIdInternal = value;
-                QuartzData = Serialize(operable);
-            }
+            if (operable == null) return;
+            
+            operable.FireInstanceId = value ?? string.Empty;
+            FireInstanceIdInternal = value;
+            QuartzData = Serialize(operable);
         }
     }
     
