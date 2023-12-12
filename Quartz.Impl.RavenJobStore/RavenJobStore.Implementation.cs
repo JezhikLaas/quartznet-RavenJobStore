@@ -1694,6 +1694,8 @@ public partial class RavenJobStore
             Signaler.SignalSchedulingChange(null, token);
         }
         
+        NotifyDebugWatcher(SchedulerExecutionStep.Completed);
+        
         TraceExit(Logger);
     }
 

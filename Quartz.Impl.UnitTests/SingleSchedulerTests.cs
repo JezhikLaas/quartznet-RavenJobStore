@@ -105,4 +105,45 @@ public class SingleSchedulerTests : SchedulerTestBase
             .HaveCount(1).And
             .ContainSingle(x => x.Name == "Job" && x.Group == "Group");
     }
+
+    [Fact(DisplayName = "If a job uses persistent data Then it is updated during completion")]
+    public async Task If_a_job_uses_persistent_data_Then_it_is_updated_during_completion()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+
+        var watcher = new ControllingWatcher(Scheduler.SchedulerInstanceId, SchedulerExecutionStep.Completed);
+
+        var store = GetStore(Scheduler);
+        store.DebugWatcher = watcher;
+        
+        var job = JobBuilder
+            .Create(typeof(PersistentJob))
+            .WithIdentity("Job", "Group")
+            .UsingJobData(nameof(PersistentJob.TestProperty), "Initial Value")
+            .StoreDurably()
+            .Build();
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, triggerOne, CancellationToken.None);
+        
+        watcher.WaitForEvent(TimeSpan.FromMinutes(1));
+
+        var checkJob = await Scheduler.GetJobDetail(new JobKey("Job", "Group"));
+
+        checkJob.Should()
+            .BeAssignableTo<IJobDetail>().Which
+            .JobDataMap.Should().Contain
+            (
+                x => x.Key == nameof(PersistentJob.TestProperty)
+                     &&
+                     x.Value.Equals("Ok")
+            );
+    }
 }

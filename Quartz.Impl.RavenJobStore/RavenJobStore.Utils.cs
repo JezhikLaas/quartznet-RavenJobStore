@@ -370,8 +370,14 @@ public partial class RavenJobStore
         ids.ForEach(session.Delete);
     }
 
-    private async Task DeleteJobIfSingleReferenceAsync(IAsyncDocumentSession session, string jobId, string triggerId)
+    private async Task DeleteJobIfSingleReferenceAsync(
+        IAsyncDocumentSession session,
+        string jobId,
+        string triggerId)
     {
+        var job = await session.LoadAsync<Job>(jobId).ConfigureAwait(false);
+        if (job.Durable) return;
+        
         var otherTriggers = await (
             from trigger in session.Query<Trigger>(nameof(TriggerIndex))
             where trigger.Scheduler == InstanceName

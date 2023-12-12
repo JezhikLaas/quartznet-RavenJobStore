@@ -5,5 +5,6 @@ public enum SchedulerExecutionStep
     Acquiring,
     Releasing,
     Firing,
-    Completing
+    Completing,
+    Completed
 }

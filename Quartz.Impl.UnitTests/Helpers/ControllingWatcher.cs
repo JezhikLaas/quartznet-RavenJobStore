@@ -17,7 +17,8 @@ public class ControllingWatcher : IDebugWatcher
         { SchedulerExecutionStep.Firing, 0 },
         { SchedulerExecutionStep.Releasing, 0 },
         { SchedulerExecutionStep.Acquiring, 0 },
-        { SchedulerExecutionStep.Completing, 0 }
+        { SchedulerExecutionStep.Completing, 0 },
+        { SchedulerExecutionStep.Completed, 0 }
     };
         
     private string InstanceId { get; }
