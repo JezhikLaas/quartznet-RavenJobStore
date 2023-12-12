@@ -2,7 +2,7 @@ using Quartz;
 using Quartz.Impl.RavenJobStore;
 using Quartz.Impl.RavenStore.Example;
 
-IHost host = Host.CreateDefaultBuilder(args)
+var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
     {
         services.AddHostedService<Worker>();
