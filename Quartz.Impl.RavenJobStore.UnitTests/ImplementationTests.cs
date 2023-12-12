@@ -91,8 +91,8 @@ public class ImplementationTests : TestBase
         checkTrigger.Should().NotBeNull();
     }
 
-    [Fact(DisplayName = "If StoreJobAndTrigger is called on and the elements exist Then they are replaced")]
-    public async Task If_StoreJobAndTrigger_is_called_on_and_the_elements_exist_Then_they_are_replaced()
+    [Fact(DisplayName = "If StoreJobAndTrigger is called on a valid store and the elements exist Then it throws")]
+    public async Task If_StoreJobAndTrigger_is_called_on_a_valid_store_and_the_elements_exist_Then_it_throws()
     {
         await Target.SchedulerStartedAsync(CancellationToken.None);
 
@@ -118,7 +118,9 @@ public class ImplementationTests : TestBase
             JobGroup = jobOne.Group,
             Description = "Two"
         };
-        await Target.StoreJobAndTriggerAsync(jobTwo, triggerTwo, CancellationToken.None);
+
+        await Target.Invoking(x => x.StoreJobAndTriggerAsync(jobTwo, triggerTwo, CancellationToken.None))
+            .Should().ThrowAsync<ObjectAlreadyExistsException>();
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
 
@@ -134,11 +136,11 @@ public class ImplementationTests : TestBase
         checkJob.Should()
             .NotBeNull().And
             .BeOfType<Job>().Which
-            .Description.Should().Be("Two");
+            .Description.Should().Be("One");
         checkTrigger.Should()
             .NotBeNull().And
             .BeOfType<Trigger>().Which
-            .Description.Should().Be("Two");
+            .Description.Should().Be("One");
     }
 
     [Fact(DisplayName = "If requested group is unknown Then IsJobGroupPaused returns false")]
