@@ -6,6 +6,7 @@ using Raven.Client.Documents.Indexes;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
+[Collection("DB")]
 public class RavenTests : TestBase
 {
     [Fact(DisplayName = "If a document is modified Then streaming it sees the changes")]

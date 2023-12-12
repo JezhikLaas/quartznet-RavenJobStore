@@ -4,6 +4,7 @@ using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
+[Collection("DB")]
 public class ClusteredSchedulerTests : SchedulerTestBase
 {
     private List<IScheduler> Schedulers { get; } = new();

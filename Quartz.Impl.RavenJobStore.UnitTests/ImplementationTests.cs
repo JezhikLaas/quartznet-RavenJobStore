@@ -14,6 +14,7 @@ namespace Quartz.Impl.RavenJobStore.UnitTests;
 
 using Quartz.Impl.RavenJobStore;
 
+[Collection("DB")]
 public class ImplementationTests : TestBase
 {
     private RavenJobStore Target { get; }

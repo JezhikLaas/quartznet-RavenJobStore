@@ -9,6 +9,7 @@ using Raven.Client.Exceptions;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
+[Collection("DB")]
 public class SingleSchedulerTests : SchedulerTestBase
 {
     private IScheduler? Scheduler { get; set; }

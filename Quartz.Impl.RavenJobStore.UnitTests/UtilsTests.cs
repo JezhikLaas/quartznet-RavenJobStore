@@ -8,6 +8,7 @@ using Xunit.Abstractions;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
+[Collection("DB")]
 public class UtilsTests : TestBase
 {
     private RavenJobStore Target { get; }
