@@ -208,4 +208,39 @@ public class SingleSchedulerTests : SchedulerTestBase
         await Scheduler.Invoking(x => x.ScheduleJob(job, new [] { triggerOne }, true, CancellationToken.None))
             .Should().NotThrowAsync();
     }
+
+    [Fact(DisplayName = "If jobs are scheduled to a not started scheduler Then it does not throw")]
+    public async Task If_jobs_are_scheduled_to_a_not_started_scheduler_Then_it_does_not_throw()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+
+        var job = JobBuilder
+            .Create(typeof(PersistentJob))
+            .WithIdentity("Job", "Group")
+            .UsingJobData(nameof(PersistentJob.TestProperty), "Initial Value")
+            .StoreDurably()
+            .Build();
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartAt(DateTimeOffset.UtcNow.AddDays(1))
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.Invoking(x => x.ScheduleJob(job, triggerOne, CancellationToken.None))
+            .Should().NotThrowAsync();
+    }
+
+    [Fact(DisplayName = "If a scheduler is not started Then it can be queried anyway")]
+    public async Task If_a_scheduler_is_not_started_Then_it_can_be_queried_anyway()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+    
+        await Scheduler.Invoking
+            (
+                x => x.GetJobKeys(GroupMatcher<JobKey>.GroupEquals("Group"), CancellationToken.None)
+            )
+            .Should().NotThrowAsync();
+    }
 }

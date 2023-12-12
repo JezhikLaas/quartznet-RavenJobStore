@@ -29,6 +29,8 @@ public class ImplementationTests : TestBase
         {
             Logger = Output.BuildLoggerFor<RavenJobStore>()
         };
+        
+        Target.EnsureIndexesAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
     public override void Dispose()

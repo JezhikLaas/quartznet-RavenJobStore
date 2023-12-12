@@ -444,6 +444,21 @@ public partial class RavenJobStore
             else break;
         }
     }
+
+    internal async Task EnsureIndexesAsync(CancellationToken token)
+    {
+        DocumentStore.ThrowIfNull();
+        
+        // We prefer static indexes.
+        await DocumentStore.ExecuteIndexAsync(new JobGroupsIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new TriggerGroupsIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new JobIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new TriggerIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new PausedTriggerGroupIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new PausedJobGroupIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new CalendarIndex(), token: token).ConfigureAwait(false);
+        await DocumentStore.ExecuteIndexAsync(new BlockedJobIndex(), token: token).ConfigureAwait(false);
+    }
     
     private async Task RetryConcurrencyConflictAsync(Func<Task> action)
     {

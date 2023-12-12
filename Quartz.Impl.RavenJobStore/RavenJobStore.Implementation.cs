@@ -65,16 +65,6 @@ public partial class RavenJobStore
         
         Logger.LogDebug("Scheduler started at {PointInTime}", SystemTime.UtcNow());
         
-        // We prefer static indexes.
-        await DocumentStore!.ExecuteIndexAsync(new JobGroupsIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new TriggerGroupsIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new JobIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new TriggerIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new PausedTriggerGroupIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new PausedJobGroupIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new CalendarIndex(), token: token).ConfigureAwait(false);
-        await DocumentStore!.ExecuteIndexAsync(new BlockedJobIndex(), token: token).ConfigureAwait(false);
-        
         using var session = GetSession();
 
         var exists = await session.Advanced.ExistsAsync(InstanceName, token);

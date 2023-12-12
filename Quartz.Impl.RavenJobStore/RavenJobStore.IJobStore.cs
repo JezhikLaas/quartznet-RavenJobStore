@@ -16,7 +16,7 @@ public partial class RavenJobStore : IJobStore
         Signaler = signaler;
         DocumentStore ??= InitializeDocumentStore();
 
-        return Task.CompletedTask;
+        return EnsureIndexesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
