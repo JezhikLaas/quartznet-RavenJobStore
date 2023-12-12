@@ -525,3 +525,12 @@ public interface IDebugWatcher
 {
     void Notify(SchedulerExecutionStep step, string instanceId);
 }
+
+#if NET6_0
+public class UnreachableException : Exception
+{
+    public UnreachableException(string message)
+        : base(message)
+    { }
+}
+#endif

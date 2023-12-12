@@ -1,15 +1,15 @@
 using FluentAssertions;
 using Newtonsoft.Json;
 using Quartz.Impl.Calendar;
+using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.Triggers;
-using Quartz.Impl.UnitTests.Helpers;
 using Quartz.Spi;
 using Xunit.Abstractions;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.RavenJobStore.UnitTests;
 
-using RavenJobStore;
-using RavenJobStore.Entities;
+using Quartz.Impl.RavenJobStore;
+using Entities;
 
 public class EntitiesTests : TestBase
 {

@@ -1,10 +1,10 @@
 using FluentAssertions;
 using Newtonsoft.Json;
-using Quartz.Impl.UnitTests.Helpers;
+using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.RavenJobStore.UnitTests;
 
 public class RavenTests : TestBase
 {

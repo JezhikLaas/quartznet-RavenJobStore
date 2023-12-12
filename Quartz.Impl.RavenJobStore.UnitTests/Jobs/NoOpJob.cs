@@ -1,4 +1,4 @@
-namespace Quartz.Impl.UnitTests.Jobs;
+namespace Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 
 public class NoOpJob : IJob
 {

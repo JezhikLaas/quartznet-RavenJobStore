@@ -2,7 +2,14 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quartz.Impl.RavenJobStore", "Quartz.Impl.RavenJobStore\Quartz.Impl.RavenJobStore.csproj", "{4FB28CCC-CFA5-4122-BD58-B17225AD6A3F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quartz.Impl.UnitTests", "Quartz.Impl.UnitTests\Quartz.Impl.UnitTests.csproj", "{172F97AB-1A48-4453-AEDC-6DCE6FC156A0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quartz.Impl.RavenJobStore.UnitTests", "Quartz.Impl.RavenJobStore.UnitTests\Quartz.Impl.RavenJobStore.UnitTests.csproj", "{172F97AB-1A48-4453-AEDC-6DCE6FC156A0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Misc", "Misc", "{256A7368-FEEC-4528-B92D-1CD060FE11DF}"
+	ProjectSection(SolutionItems) = preProject
+		qodana.yaml = qodana.yaml
+		README.md = README.md
+		LICENSE = LICENSE
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

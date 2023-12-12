@@ -4,7 +4,7 @@ using System.Reflection;
 using Quartz.Core;
 using Raven.Client.Documents;
 
-namespace Quartz.Impl.UnitTests.Helpers;
+namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 
 public abstract class SchedulerTestBase : TestBase
 {
@@ -82,7 +82,7 @@ public abstract class SchedulerTestBase : TestBase
     /// This is only for testing - never try to use something like this in production code.
     /// </summary>
     /// <returns></returns>
-    protected static RavenJobStore.RavenJobStore GetStore(IScheduler scheduler)
+    protected static RavenJobStore GetStore(IScheduler scheduler)
     {
         var realSchedulerField = scheduler
             .GetType()
@@ -95,6 +95,6 @@ public abstract class SchedulerTestBase : TestBase
 
         var resources = (QuartzSchedulerResources)resourcesField!.GetValue(realScheduler)!;
 
-        return (RavenJobStore.RavenJobStore)resources.JobStore;
+        return (RavenJobStore)resources.JobStore;
     }
 }

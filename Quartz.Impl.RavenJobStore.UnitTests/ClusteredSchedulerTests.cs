@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Quartz.Impl.RavenJobStore;
-using Quartz.Impl.UnitTests.Helpers;
-using Quartz.Impl.UnitTests.Jobs;
+using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
+using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.RavenJobStore.UnitTests;
 
 public class ClusteredSchedulerTests : SchedulerTestBase
 {

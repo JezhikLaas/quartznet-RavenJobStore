@@ -2,17 +2,17 @@ using FluentAssertions;
 using Quartz.Impl.Calendar;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.RavenJobStore.Entities;
+using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
+using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 using Quartz.Impl.Triggers;
-using Quartz.Impl.UnitTests.Helpers;
-using Quartz.Impl.UnitTests.Jobs;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Xunit.Abstractions;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.RavenJobStore.UnitTests;
 
-using RavenJobStore;
+using Quartz.Impl.RavenJobStore;
 
 public class ImplementationTests : TestBase
 {

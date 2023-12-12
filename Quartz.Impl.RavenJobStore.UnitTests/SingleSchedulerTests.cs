@@ -3,11 +3,11 @@ using FluentAssertions;
 using Quartz.Impl.Matchers;
 using Quartz.Impl.RavenJobStore;
 using Quartz.Impl.RavenJobStore.Entities;
-using Quartz.Impl.UnitTests.Helpers;
-using Quartz.Impl.UnitTests.Jobs;
+using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
+using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 using Quartz.Spi;
 
-namespace Quartz.Impl.UnitTests;
+namespace Quartz.Impl.RavenJobStore.UnitTests;
 
 public class SingleSchedulerTests : SchedulerTestBase
 {

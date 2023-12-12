@@ -17,7 +17,7 @@ using Raven.Client.Documents.Session;
 // ReSharper disable MemberCanBePrivate.Global
 // Internal instead of private for unit tests.
 
-[assembly: InternalsVisibleTo("Quartz.Impl.UnitTests")]
+[assembly: InternalsVisibleTo("Quartz.Impl.RavenJobStore.UnitTests")]
 
 namespace Quartz.Impl.RavenJobStore;
 

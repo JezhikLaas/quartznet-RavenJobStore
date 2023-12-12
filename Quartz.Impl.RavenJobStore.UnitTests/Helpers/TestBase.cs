@@ -1,7 +1,7 @@
 using Raven.Client.Documents;
 using Raven.TestDriver;
 
-namespace Quartz.Impl.UnitTests.Helpers;
+namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 
 public abstract class TestBase : RavenTestDriver
 {

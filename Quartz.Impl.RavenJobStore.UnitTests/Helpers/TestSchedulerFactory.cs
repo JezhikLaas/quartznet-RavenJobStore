@@ -1,7 +1,7 @@
 using System.Collections.Specialized;
 using System.Reflection;
 
-namespace Quartz.Impl.UnitTests.Helpers;
+namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 
 /// <summary>
 /// The StdSchedulerFactory of Quartz does not allow for multiple schedulers
