@@ -1,6 +1,7 @@
 using System.Text.Json;
+using Quartz;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public class RavenDbProviderOptions
 {

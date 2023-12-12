@@ -1,6 +1,7 @@
+using Quartz;
 using Quartz.Spi;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public class SchedulerSignalerStub : ISchedulerSignaler
 {

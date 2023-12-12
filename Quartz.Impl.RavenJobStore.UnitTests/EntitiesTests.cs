@@ -1,3 +1,4 @@
+using Domla.Quartz.Raven.Entities;
 using FluentAssertions;
 using Newtonsoft.Json;
 using Quartz.Impl.Calendar;
@@ -8,13 +9,10 @@ using Xunit.Abstractions;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
-using Quartz.Impl.RavenJobStore;
-using Entities;
-
 [Collection("DB")]
 public class EntitiesTests : TestBase
 {
-    private RavenJobStore Target { get; }
+    private Domla.Quartz.Raven.RavenJobStore Target { get; }
     
     private ITestOutputHelper Output { get; }
 
@@ -23,9 +21,9 @@ public class EntitiesTests : TestBase
         var store = CreateStore();
         
         Output = output;
-        Target = new RavenJobStore(store)
+        Target = new Domla.Quartz.Raven.RavenJobStore(store)
         {
-            Logger = Output.BuildLoggerFor<RavenJobStore>()
+            Logger = Output.BuildLoggerFor<Domla.Quartz.Raven.RavenJobStore>()
         };
     }
 
@@ -36,15 +34,15 @@ public class EntitiesTests : TestBase
         using var store = CreateStore();
         using (var session = store.OpenAsyncSession())
         {
-            await session.StoreAsync(new Calendar(item, "test", Target.InstanceName));
+            await session.StoreAsync(new Domla.Quartz.Raven.Entities.Calendar(item, "test", Target.InstanceName));
             await session.SaveChangesAsync();
         }
 
         using (var session = store.OpenAsyncSession())
         {
-            var calendar = await session.LoadAsync<Calendar>
+            var calendar = await session.LoadAsync<Domla.Quartz.Raven.Entities.Calendar>
             (
-                Calendar.GetId(Target.InstanceName, "test")
+                Domla.Quartz.Raven.Entities.Calendar.GetId(Target.InstanceName, "test")
             );
 
             calendar.Item.Should().BeEquivalentTo(item);

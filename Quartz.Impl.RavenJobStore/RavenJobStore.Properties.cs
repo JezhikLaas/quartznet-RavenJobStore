@@ -2,13 +2,14 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
+using Quartz;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public partial class RavenJobStore
 {

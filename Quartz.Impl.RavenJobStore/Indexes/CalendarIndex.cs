@@ -1,6 +1,6 @@
 using Raven.Client.Documents.Indexes;
 
-namespace Quartz.Impl.RavenJobStore.Indexes;
+namespace Domla.Quartz.Raven.Indexes;
 
 internal class CalendarIndex : AbstractIndexCreationTask<Entities.Calendar>
 {

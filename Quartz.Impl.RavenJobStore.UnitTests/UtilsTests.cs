@@ -1,5 +1,5 @@
+using Domla.Quartz.Raven.Entities;
 using FluentAssertions;
-using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 using Quartz.Impl.Triggers;
@@ -11,7 +11,7 @@ namespace Quartz.Impl.RavenJobStore.UnitTests;
 [Collection("DB")]
 public class UtilsTests : TestBase
 {
-    private RavenJobStore Target { get; }
+    private Domla.Quartz.Raven.RavenJobStore Target { get; }
     
     private ITestOutputHelper Output { get; }
 
@@ -20,9 +20,9 @@ public class UtilsTests : TestBase
         var store = CreateStore();
         
         Output = output;
-        Target = new RavenJobStore(store)
+        Target = new Domla.Quartz.Raven.RavenJobStore(store)
         {
-            Logger = Output.BuildLoggerFor<RavenJobStore>()
+            Logger = Output.BuildLoggerFor<Domla.Quartz.Raven.RavenJobStore>()
         };
 
         Target.EnsureIndexesAsync(CancellationToken.None).GetAwaiter().GetResult(); 

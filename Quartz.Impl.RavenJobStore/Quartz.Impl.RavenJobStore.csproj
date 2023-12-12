@@ -14,6 +14,10 @@
         <RepositoryUrl>https://github.com/JezhikLaas/quartznet-RavenJobStore</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageId>Domla.Quartz.RavenJobStore</PackageId>
+        <PackageTags>Quartz;RavenDB</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RootNamespace>Domla.Quartz.Raven</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -23,6 +27,7 @@
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
       <PackageReference Include="Quartz" Version="3.8.0" />
       <PackageReference Include="RavenDB.Client" Version="5.4.112" />
+      <None Include="..\README.md" Pack="true" PackagePath="" />  
     </ItemGroup>
 
 </Project>

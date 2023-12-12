@@ -1,5 +1,8 @@
+using JetBrains.Annotations;
+
 namespace Quartz.Impl.RavenStore.Example;
 
+[UsedImplicitly]
 public class Worker : BackgroundService
 {
     private ILogger<Worker> Logger { get; }
@@ -17,7 +20,6 @@ public class Worker : BackgroundService
         Logger.LogInformation("Starting scheduler ...");
         
         var scheduler = await SchedulerFactory.GetScheduler(stoppingToken);
-        await scheduler.Start(stoppingToken);
 
         var emptyFridgeJob = JobBuilder.Create<EmptyFridge>()
             .WithIdentity("EmptyFridgeJob", "Office")
@@ -75,6 +77,8 @@ public class Worker : BackgroundService
         await scheduler.ScheduleJob(visitJob, new [] { visitTrigger }, true, stoppingToken);
         
         Logger.LogInformation("Scheduler started, processing jobs now");
+
+        await scheduler.Start(stoppingToken);
 
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }

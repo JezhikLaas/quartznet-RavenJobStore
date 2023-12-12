@@ -71,7 +71,7 @@ public abstract class SchedulerTestBase : TestBase
             ["quartz.scheduler.instanceId"] = "AUTO",
             ["quartz.threadPool.threadCount"] = threadCount.ToString(CultureInfo.InvariantCulture),
             ["quartz.serializer.type"] = "binary",
-            ["quartz.jobStore.type"] = "Quartz.Impl.RavenJobStore.RavenJobStore, Quartz.Impl.RavenJobStore",
+            ["quartz.jobStore.type"] = "Domla.Quartz.Raven.RavenJobStore, Quartz.Impl.RavenJobStore",
             ["quartz.jobStore.urls"] = $"[\"{address}\"]",
             ["quartz.jobStore.database"] = database,
             ["quartz.jobStore.collectionName"] = collectionName
@@ -82,7 +82,7 @@ public abstract class SchedulerTestBase : TestBase
     /// This is only for testing - never try to use something like this in production code.
     /// </summary>
     /// <returns></returns>
-    protected static RavenJobStore GetStore(IScheduler scheduler)
+    protected static Domla.Quartz.Raven.RavenJobStore GetStore(IScheduler scheduler)
     {
         var realSchedulerField = scheduler
             .GetType()
@@ -95,6 +95,6 @@ public abstract class SchedulerTestBase : TestBase
 
         var resources = (QuartzSchedulerResources)resourcesField!.GetValue(realScheduler)!;
 
-        return (RavenJobStore)resources.JobStore;
+        return (Domla.Quartz.Raven.RavenJobStore)resources.JobStore;
     }
 }

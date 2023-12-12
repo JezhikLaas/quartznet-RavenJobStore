@@ -1,8 +1,9 @@
+using Domla.Quartz.Raven.Entities;
+using Quartz;
 using Quartz.Impl.Matchers;
-using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Spi;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 /// <inheritdoc />
 public partial class RavenJobStore : IJobStore

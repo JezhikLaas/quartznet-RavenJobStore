@@ -1,27 +1,28 @@
 using System.Data.Common;
-#if NET7_0_OR_GREATER
-using System.Diagnostics;
-#endif
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
+using Domla.Quartz.Raven.Entities;
+using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
+using Quartz;
 using Quartz.Impl.Matchers;
-using Quartz.Impl.RavenJobStore.Entities;
-using Quartz.Impl.RavenJobStore.Indexes;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Conventions;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Session;
+#if NET7_0_OR_GREATER
+using System.Diagnostics;
+#endif
 
 // ReSharper disable MemberCanBePrivate.Global
 // Internal instead of private for unit tests.
 
 [assembly: InternalsVisibleTo("Quartz.Impl.RavenJobStore.UnitTests")]
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public partial class RavenJobStore
 {
@@ -598,7 +599,7 @@ public partial class RavenJobStore
 
         var result = await session
             .Advanced
-            .ExistsAsync(Entities.Calendar.GetId(InstanceName, calName), token)
+            .ExistsAsync(Calendar.GetId(InstanceName, calName), token)
             .ConfigureAwait(false);
         
         TraceExit(Logger, result);
@@ -665,7 +666,7 @@ public partial class RavenJobStore
         ).ToListAsync(token).ConfigureAwait(false);
 
         var calendars = await (
-            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
+            from calendar in session.Query<Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar.Id
         ).ToListAsync(token).ConfigureAwait(false);
@@ -709,7 +710,7 @@ public partial class RavenJobStore
 
         var calendarExists = await session
             .Advanced
-            .ExistsAsync(Entities.Calendar.GetId(InstanceName, name), token)
+            .ExistsAsync(Calendar.GetId(InstanceName, name), token)
             .ConfigureAwait(false);
 
         if (calendarExists && replaceExisting == false)
@@ -717,7 +718,7 @@ public partial class RavenJobStore
             throw new ObjectAlreadyExistsException($"Calendar with name '{name}' already exists");
         }
 
-        var calendarToStore = new Entities.Calendar(calendar, name, InstanceName); 
+        var calendarToStore = new Calendar(calendar, name, InstanceName); 
 
         await session.StoreAsync
         (
@@ -759,7 +760,7 @@ public partial class RavenJobStore
 
         var exists = await session
             .Advanced
-            .ExistsAsync(Entities.Calendar.GetId(InstanceName, calendarName), token)
+            .ExistsAsync(Calendar.GetId(InstanceName, calendarName), token)
             .ConfigureAwait(false);
 
         if (exists == false)
@@ -768,7 +769,7 @@ public partial class RavenJobStore
             return false;
         }
         
-        session.Delete(Entities.Calendar.GetId(InstanceName, calendarName));
+        session.Delete(Calendar.GetId(InstanceName, calendarName));
 
         await session
             .SaveChangesAsync(token)
@@ -786,7 +787,7 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var calendar = await session
-            .LoadAsync<Entities.Calendar>(Entities.Calendar.GetId(InstanceName, calendarName), token)
+            .LoadAsync<Calendar>(Calendar.GetId(InstanceName, calendarName), token)
             .ConfigureAwait(false);
 
         TraceExit(Logger, calendar?.Item);
@@ -835,7 +836,7 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
+            from calendar in session.Query<Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar
         ).CountAsync(token).ConfigureAwait(false);
@@ -946,7 +947,7 @@ public partial class RavenJobStore
         using var session = GetSession();
 
         var result = await (
-            from calendar in session.Query<Entities.Calendar>(nameof(CalendarIndex))
+            from calendar in session.Query<Calendar>(nameof(CalendarIndex))
             where calendar.Scheduler == InstanceName
             select calendar.Name
         ).ToListAsync(token).ConfigureAwait(false);
@@ -1581,7 +1582,7 @@ public partial class RavenJobStore
             }
 
             var calendar = await session
-                .LoadAsync<Entities.Calendar>(storedTrigger.CalendarId, token)
+                .LoadAsync<Calendar>(storedTrigger.CalendarId, token)
                 .ConfigureAwait(false);
 
             var operableTrigger = storedTrigger.Item.ThrowIfNull();

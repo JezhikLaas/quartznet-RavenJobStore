@@ -1,3 +1,5 @@
+using Domla.Quartz.Raven;
+
 namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 
 public class ControllingWatcher : IDebugWatcher

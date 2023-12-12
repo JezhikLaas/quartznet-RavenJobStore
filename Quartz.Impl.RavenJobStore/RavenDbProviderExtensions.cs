@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Quartz;
+using Quartz.Impl;
 using Quartz.Spi;
 using Quartz.Util;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 [SuppressMessage("ReSharper", "UnusedMember.Global")]
 // ReSharper disable once UnusedType.Global
@@ -23,7 +25,6 @@ public static class RavenDbProviderExtensions
         );
         
         config.Invoke(new RavenDbProviderOptions(options));
-        
     }
 
     public static void UseRavenDb(

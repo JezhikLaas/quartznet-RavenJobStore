@@ -1,4 +1,4 @@
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public enum SchedulerExecutionStep
 {

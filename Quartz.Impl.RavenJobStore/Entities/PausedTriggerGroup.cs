@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Quartz.Impl.RavenJobStore.Entities;
+namespace Domla.Quartz.Raven.Entities;
 
 internal class PausedTriggerGroup
 {

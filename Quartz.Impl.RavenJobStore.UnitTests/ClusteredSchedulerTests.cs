@@ -1,3 +1,4 @@
+using Domla.Quartz.Raven;
 using FluentAssertions;
 using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.RavenJobStore.UnitTests.Jobs;

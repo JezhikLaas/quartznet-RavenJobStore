@@ -1,8 +1,9 @@
 using Newtonsoft.Json;
+using Quartz;
 using Quartz.Simpl;
 using Quartz.Spi;
 
-namespace Quartz.Impl.RavenJobStore.Entities;
+namespace Domla.Quartz.Raven.Entities;
 
 internal class Trigger : SerializeQuartzData
 {

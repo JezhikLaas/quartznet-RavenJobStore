@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
+using Quartz;
 
-namespace Quartz.Impl.RavenJobStore.Entities;
+namespace Domla.Quartz.Raven.Entities;
 
 internal abstract class SerializeQuartzData
 {

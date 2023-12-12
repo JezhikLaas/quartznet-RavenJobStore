@@ -1,18 +1,19 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Domla.Quartz.Raven.Entities;
+using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
-using Quartz.Impl.RavenJobStore.Entities;
-using Quartz.Impl.RavenJobStore.Indexes;
+using Quartz;
 using Quartz.Simpl;
 using Quartz.Spi;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
-using Raven.Client.Documents.Session;
 using Raven.Client.Documents.Linq;
 using Raven.Client.Documents.Operations;
+using Raven.Client.Documents.Session;
 using Raven.Client.Exceptions;
 
-namespace Quartz.Impl.RavenJobStore;
+namespace Domla.Quartz.Raven;
 
 public partial class RavenJobStore
 {
@@ -177,7 +178,7 @@ public partial class RavenJobStore
             return false;
 
         var calendar = await session
-            .LoadAsync<Entities.Calendar>(trigger.CalendarId, token)
+            .LoadAsync<Calendar>(trigger.CalendarId, token)
             .ConfigureAwait(false);
 
         var operableTrigger = trigger.Item.ThrowIfNull();
@@ -511,10 +512,10 @@ public partial class RavenJobStore
         throw new Exception("Should never go here");
     }
 
-    private partial void NotifyDebugWatcher(SchedulerExecutionStep step);
+    partial void NotifyDebugWatcher(SchedulerExecutionStep step);
     
     #if DEBUG
-    private partial void NotifyDebugWatcher(SchedulerExecutionStep step)
+    partial void NotifyDebugWatcher(SchedulerExecutionStep step)
     {
         DebugWatcher?.Notify(step, InstanceId);
     }

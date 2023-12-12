@@ -6,9 +6,12 @@
 # Quartz.NET-RavenJobStore
 Not exactly a fork of, but inspired by [Quartz.NET-RavenDB](https://github.com/ravendb/quartznet-RavenDB)
 
-Under development, no release yet.
+First prerelease available on nuget.
 
 ## Project goals
 * Can handle high volumes of jobs and triggers.
 * Suitable for clustered schedulers.
 * Different schedulers (instance names) can share the same database.
+
+## How to get started
+No docs right now, please see the example for now.
