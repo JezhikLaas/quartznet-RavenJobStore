@@ -1,7 +1,6 @@
 using FakeItEasy;
 using FluentAssertions;
 using Quartz.Impl.Matchers;
-using Quartz.Impl.RavenJobStore;
 using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.RavenJobStore.UnitTests.Jobs;

@@ -1,5 +1,3 @@
-using Quartz.Impl.RavenJobStore;
-
 namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 
 public class ControllingWatcher : IDebugWatcher
