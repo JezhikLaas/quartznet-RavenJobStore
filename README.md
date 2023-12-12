@@ -15,3 +15,7 @@ First prerelease available on nuget.
 
 ## How to get started
 No docs right now, please see the example for now.
+
+### To install the package
+
+`dotnet add package Domla.Quartz.RavenJobStore --version 0.5.0-prerelease`
