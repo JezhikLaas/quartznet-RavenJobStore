@@ -5,6 +5,7 @@ using Quartz.Impl.RavenJobStore.Entities;
 using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 using Quartz.Spi;
+using Raven.Client.Exceptions;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
 
@@ -144,5 +145,67 @@ public class SingleSchedulerTests : SchedulerTestBase
                      &&
                      x.Value.Equals("Ok")
             );
+    }
+
+    [Fact(DisplayName = "If a schedule tries to replace a job Then no concurrency exception is thrown")]
+    public async Task If_a_schedule_tries_to_replace_a_job_Then_no_concurrency_exception_is_thrown()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+
+        var job = JobBuilder
+            .Create(typeof(PersistentJob))
+            .WithIdentity("Job", "Group")
+            .UsingJobData(nameof(PersistentJob.TestProperty), "Initial Value")
+            .StoreDurably()
+            .Build();
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartAt(DateTimeOffset.UtcNow.AddDays(1))
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, triggerOne, CancellationToken.None);
+
+        await Scheduler.Shutdown();
+        
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+
+        await Scheduler.Invoking(x => x.ScheduleJob(job, triggerOne, CancellationToken.None))
+            .Should().NotThrowAsync<ConcurrencyException>();
+    }
+
+    [Fact(DisplayName = "If a schedule tries to replace a job with replace Then no exception is thrown")]
+    public async Task If_a_schedule_tries_to_replace_a_job_with_replace_Then_no_exception_is_thrown()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+
+        var job = JobBuilder
+            .Create(typeof(PersistentJob))
+            .WithIdentity("Job", "Group")
+            .UsingJobData(nameof(PersistentJob.TestProperty), "Initial Value")
+            .StoreDurably()
+            .Build();
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartAt(DateTimeOffset.UtcNow.AddDays(1))
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, triggerOne, CancellationToken.None);
+
+        await Scheduler.Shutdown();
+        
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+
+        await Scheduler.Invoking(x => x.ScheduleJob(job, new [] { triggerOne }, true, CancellationToken.None))
+            .Should().NotThrowAsync();
     }
 }

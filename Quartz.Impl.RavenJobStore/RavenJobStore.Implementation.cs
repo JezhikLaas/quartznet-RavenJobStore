@@ -124,28 +124,41 @@ public partial class RavenJobStore
     internal async Task StoreJobAndTriggerAsync(
         IJobDetail newJob,
         IOperableTrigger newTrigger,
-        CancellationToken cancellationToken)
+        CancellationToken token)
     {
         TraceEnter(Logger);
         
         using var session = GetSession();
-        var jobToStore = new Job(newJob, InstanceName);
+
+        if (await session.Advanced.ExistsAsync(newJob.Key.GetDatabaseId(InstanceName), token).ConfigureAwait(false))
+        {
+            TraceExit(Logger, nameof(ObjectAlreadyExistsException));
+            throw new ObjectAlreadyExistsException(newJob);
+        }
+
+        if (await session.Advanced.ExistsAsync(newTrigger.Key.GetDatabaseId(InstanceName), token).ConfigureAwait(false))
+        {
+            TraceExit(Logger, nameof(ObjectAlreadyExistsException));
+            throw new ObjectAlreadyExistsException(newTrigger);
+        }
 
         var triggerToStore = await CreateConfiguredTriggerAsync
         (
             newTrigger,
-            session, cancellationToken).ConfigureAwait(false);
+            session, token).ConfigureAwait(false);
         
+        var jobToStore = new Job(newJob, InstanceName);
+
         await session
-            .StoreAsync(triggerToStore, triggerToStore.Id, cancellationToken)
+            .StoreAsync(triggerToStore, triggerToStore.Id, token)
             .ConfigureAwait(false);
 
         await session
-            .StoreAsync(jobToStore, jobToStore.Id, cancellationToken)
+            .StoreAsync(jobToStore, jobToStore.Id, token)
             .ConfigureAwait(false);
 
         await session
-            .SaveChangesAsync(cancellationToken)
+            .SaveChangesAsync(token)
             .ConfigureAwait(false);
 
         TraceExit(Logger);

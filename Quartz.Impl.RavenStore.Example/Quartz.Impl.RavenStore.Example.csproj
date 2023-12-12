@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>dotnet-Quartz.Impl.RavenStore.Example-DF433219-5B15-4999-933E-C3613196FACC</UserSecretsId>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1"/>
+        <PackageReference Include="Quartz" Version="3.8.0" />
+        <PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.8.0" />
+        <PackageReference Include="Quartz.Extensions.Hosting" Version="3.8.0" />
+        <PackageReference Include="RavenDB.Client" Version="5.4.112" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Quartz.Impl.RavenJobStore\Quartz.Impl.RavenJobStore.csproj" />
+    </ItemGroup>
+</Project>

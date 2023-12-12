@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Misc", "Misc", "{256A7368-F
 		LICENSE = LICENSE
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quartz.Impl.RavenStore.Example", "Quartz.Impl.RavenStore.Example\Quartz.Impl.RavenStore.Example.csproj", "{E2A7254F-90F9-41B2-9247-8AD537C1D772}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,5 +27,9 @@ Global
 		{172F97AB-1A48-4453-AEDC-6DCE6FC156A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{172F97AB-1A48-4453-AEDC-6DCE6FC156A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{172F97AB-1A48-4453-AEDC-6DCE6FC156A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2A7254F-90F9-41B2-9247-8AD537C1D772}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2A7254F-90F9-41B2-9247-8AD537C1D772}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2A7254F-90F9-41B2-9247-8AD537C1D772}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2A7254F-90F9-41B2-9247-8AD537C1D772}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

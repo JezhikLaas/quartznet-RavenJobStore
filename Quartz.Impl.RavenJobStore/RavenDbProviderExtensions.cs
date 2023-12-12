@@ -50,14 +50,16 @@ public static class RavenDbProviderExtensions
         }
     }
 
-    public static void UseRavenJobStoreLogging(this IHost host)
+    public static IHost UseRavenJobStoreLogging(this IHost host)
     {
         var factory = host.Services.GetService<ILoggerFactory>();
-        if (factory == null) return;
+        if (factory == null) return host;
 
         if (host.Services.GetService<IJobStore>() is RavenJobStore store)
         {
             store.Logger = new Logger<RavenJobStore>(factory);
         }
+
+        return host;
     }
 }
