@@ -19,6 +19,8 @@ public partial class RavenJobStore
 
     private ISchedulerSignaler Signaler { get; set; } = new SchedulerSignalerStub();
     
+    internal static ILoggerFactory? LoggerFactory { get; set; } 
+    
     private string[]? RavenNodes { get; set; } 
 
     /// <summary>

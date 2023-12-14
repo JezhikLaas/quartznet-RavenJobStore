@@ -4,7 +4,7 @@ using Quartz.Impl.RavenStore.Example;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Conventions;
 
-//CreateFromProperties().Run();
+// CreateFromProperties().Run();
 CreateWithOwnDocumentStore().Run();
 
 #pragma warning disable CS8321 // Local function is declared but never used
@@ -100,5 +100,4 @@ IHost CreateFromProperties() =>
             services.AddQuartzHostedService(quartz => quartz.WaitForJobsToComplete = true);
         })
         .Build()
-        // Does only work for injected document stores for now.
         .UseRavenJobStoreLogging();

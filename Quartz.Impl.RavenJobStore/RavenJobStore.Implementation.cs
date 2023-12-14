@@ -29,10 +29,17 @@ public partial class RavenJobStore
     //internal static RavenJobStore? Instance;
 
     public RavenJobStore()
-    { }
+    {
+        Logger = LoggerFactory != null
+            ? LoggerFactory.CreateLogger<RavenJobStore>()
+            : Logger;
+    }
 
     public RavenJobStore(IDocumentStore store)
     {
+        Logger = LoggerFactory != null
+            ? LoggerFactory.CreateLogger<RavenJobStore>()
+            : Logger;
         DocumentStore = store;
     }
 

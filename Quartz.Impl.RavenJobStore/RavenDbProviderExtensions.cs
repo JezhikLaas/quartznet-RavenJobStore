@@ -14,6 +14,12 @@ namespace Domla.Quartz.Raven;
 // ReSharper disable once UnusedType.Global
 public static class RavenDbProviderExtensions
 {
+    /// <summary>
+    /// Configures the persistent store options to use RavenDB as the job store.
+    /// Use this one if the IDocumentStore shall be created by <see cref="RavenJobStore"/>.
+    /// </summary>
+    /// <param name="options">The persistent store options.</param>
+    /// <param name="config">The configuration action for RavenDB provider options.</param>
     public static void UseRavenDb(
         this SchedulerBuilder.PersistentStoreOptions options,
         Action<RavenDbProviderOptions> config)
@@ -27,8 +33,14 @@ public static class RavenDbProviderExtensions
         config.Invoke(new RavenDbProviderOptions(options));
     }
 
+    /// <summary>
+    /// Configures the scheduler to use RavenDB as the persistent store.
+    /// To be used if a IDocumentStore should be fetched from DI.
+    /// </summary>
+    /// <param name="options">The persistent store options.</param>
+    /// <param name="services">The service collection.</param>
     public static void UseRavenDb(
-        this SchedulerBuilder.PersistentStoreOptions options, 
+        this SchedulerBuilder.PersistentStoreOptions options,
         IServiceCollection services)
     {
         options.SetProperty
@@ -40,26 +52,26 @@ public static class RavenDbProviderExtensions
         services.AddSingleton<IJobStore, RavenJobStore>();
     }
 
-    public static void UseRavenJobStoreLogging(this IApplicationBuilder builder)
+    /// <summary>
+    /// Adds RavenJobStore logging to the application's request pipeline.
+    /// </summary>
+    /// <param name="builder">The <see cref="IApplicationBuilder"/> instance.</param>
+    /// <returns>The <see cref="IApplicationBuilder"/> instance with RavenJobStore logging added.</returns>
+    public static IApplicationBuilder UseRavenJobStoreLogging(this IApplicationBuilder builder)
     {
-        var factory = builder.ApplicationServices.GetService<ILoggerFactory>();
-        if (factory == null) return;
+        RavenJobStore.LoggerFactory = builder.ApplicationServices.GetService<ILoggerFactory>();
 
-        if (builder.ApplicationServices.GetService<IJobStore>() is RavenJobStore store)
-        {
-            store.Logger = new Logger<RavenJobStore>(factory);
-        }
+        return builder;
     }
 
+    /// <summary>
+    /// Configures the host to use RavenJobStore's logging functionality.
+    /// </summary>
+    /// <param name="host">The host to configure.</param>
+    /// <returns>The configured host.</returns>
     public static IHost UseRavenJobStoreLogging(this IHost host)
     {
-        var factory = host.Services.GetService<ILoggerFactory>();
-        if (factory == null) return host;
-
-        if (host.Services.GetService<IJobStore>() is RavenJobStore store)
-        {
-            store.Logger = new Logger<RavenJobStore>(factory);
-        }
+        RavenJobStore.LoggerFactory = host.Services.GetService<ILoggerFactory>(); 
 
         return host;
     }
