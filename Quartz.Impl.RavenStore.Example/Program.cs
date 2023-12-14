@@ -5,7 +5,7 @@ using Raven.Client.Documents;
 using Raven.Client.Documents.Conventions;
 
 // CreateFromProperties().Run();
-CreateWithOwnDocumentStore().Run();
+CreateFromProperties().Run();
 
 #pragma warning disable CS8321 // Local function is declared but never used
 // For documentation purposes.
@@ -84,6 +84,12 @@ IHost CreateFromProperties() =>
 
                         // The database is expected to be created.
                         configuration.Database = "QuartzDemo";
+
+                        // Time to wait for non-stale query results.
+                        configuration.SecondsToWaitForIndexing = 15; // default
+
+                        // How often to retry an operation when failed because of a concurrency exception.
+                        configuration.ConcurrencyErrorRetries = 100; // default
 
                         // Just for the record - you can prefix the collection 
                         // names for our classes with a common name.

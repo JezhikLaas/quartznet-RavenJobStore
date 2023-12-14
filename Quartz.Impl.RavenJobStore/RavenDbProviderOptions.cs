@@ -49,6 +49,26 @@ public class RavenDbProviderOptions
     }
 
     /// <summary>
+    /// Number of retries in the case of concurrency exception. Default is 100.
+    /// Do not set to a low value if you plan to use a cluster of schedulers.
+    /// </summary>
+    // ReSharper disable once UnusedMember.Global
+    public int ConcurrencyErrorRetries
+    {
+        set => _options.SetProperty("quartz.jobStore.concurrencyErrorRetries", value.ToString());
+    }
+
+    /// <summary>
+    /// RavenDB needs some time to process the indexes after adding / modifying
+    /// a document. This sets the maximum wait time for indexes to become
+    /// up to date before performing a query. The default is 15 seconds.
+    /// </summary>
+    public int SecondsToWaitForIndexing
+    {
+        set => _options.SetProperty("quartz.jobStore.secondsToWaitForIndexing", value.ToString());
+    }
+
+    /// <summary>
     ///     Optional collection name to store all scheduler data in.
     /// </summary>
     // ReSharper disable once UnusedMember.Global

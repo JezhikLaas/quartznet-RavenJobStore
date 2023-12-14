@@ -29,7 +29,7 @@ public partial class RavenJobStore
         return result;
     }
 
-    private static void AdvancedOnSessionDisposing(object? sender, SessionDisposingEventArgs e)
+    private void AdvancedOnSessionDisposing(object? sender, SessionDisposingEventArgs e)
     {
         if (e.Session is not IAsyncDocumentSession session) return;
         
@@ -37,9 +37,12 @@ public partial class RavenJobStore
         session.Advanced.OnSessionDisposing -= AdvancedOnSessionDisposing;
     }
 
-    private static void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e)
+    private void AdvancedOnBeforeQuery(object? _, BeforeQueryEventArgs e)
     {
-        e.QueryCustomization.WaitForNonStaleResults();
+        if (SecondsToWaitForIndexing > 0)
+        {
+            e.QueryCustomization.WaitForNonStaleResults(TimeSpan.FromSeconds(SecondsToWaitForIndexing));
+        }
     }
 
     private async Task RestartTriggersForRecoveringJobsAsync(IAsyncDocumentSession session, CancellationToken token)
@@ -420,7 +423,7 @@ public partial class RavenJobStore
     private void WaitForIndexing()
     {
         var operationExecutor = DocumentStore!.Maintenance.ForDatabase(DocumentStore!.Database);
-        var timeout = TimeSpan.FromMinutes(1.0);
+        var timeout = TimeSpan.FromSeconds(SecondsToWaitForIndexing);
         var stopwatch = Stopwatch.StartNew();
         
         while (stopwatch.Elapsed < timeout)
@@ -463,7 +466,7 @@ public partial class RavenJobStore
     
     private async Task RetryConcurrencyConflictAsync(Func<Task> action)
     {
-        var counter = 100;
+        var counter = ConcurrencyErrorRetries;
         
         while (counter-- > 0)
         {
@@ -488,7 +491,7 @@ public partial class RavenJobStore
 
     private async Task<T> RetryConcurrencyConflictAsync<T>(Func<Task<T>> action)
     {
-        var counter = 100;
+        var counter = ConcurrencyErrorRetries;
         
         while (counter-- > 0)
         {
@@ -509,7 +512,7 @@ public partial class RavenJobStore
             }
         }
 
-        throw new Exception("Should never go here");
+        throw new UnreachableException("Should never go here");
     }
 
     partial void NotifyDebugWatcher(SchedulerExecutionStep step);
