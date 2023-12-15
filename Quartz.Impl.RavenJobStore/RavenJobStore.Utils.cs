@@ -145,7 +145,7 @@ public partial class RavenJobStore
         var jobId = jobKey.GetDatabaseId(InstanceName);
         
         var triggersForJob = await (
-            from item in session.Query<Trigger>()
+            from item in session.Query<Trigger>(nameof(TriggerIndex))
             where item.JobId == jobId
             select item
         ).ToListAsync(token).ConfigureAwait(false);
@@ -161,7 +161,7 @@ public partial class RavenJobStore
         IReadOnlyList<string> jobKeys,
         CancellationToken token) =>
         await (
-            from trigger in session.Query<Trigger>()
+            from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                 .Include(x => x.CalendarId)
             where trigger.JobId.In(jobKeys)
             select trigger
@@ -209,7 +209,7 @@ public partial class RavenJobStore
         {
             // Fetch all triggers which seem to be in an inconsistent state.
             var inconsistentTriggers = await (
-                from trigger in session.Query<Trigger>()
+                from trigger in session.Query<Trigger>(nameof(TriggerIndex))
                     .Include(x => x.Scheduler)
                 where trigger.Scheduler == InstanceName
                       &&

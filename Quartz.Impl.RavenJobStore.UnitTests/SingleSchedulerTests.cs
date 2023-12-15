@@ -245,4 +245,20 @@ public class SingleSchedulerTests : SchedulerTestBase
             )
             .Should().NotThrowAsync();
     }
+
+    [Fact(DisplayName = "If a job is added twice Then the second job replaces the first")]
+    public async Task If_a_job_is_added_twice_Then_the_second_job_replaces_the_first()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test");
+        
+        var emptyFridgeJob = JobBuilder.Create<NoOpJob>()
+            .WithIdentity("EmptyFridgeJob", "Office")
+            .StoreDurably()
+            .RequestRecovery()
+            .Build();
+        await Scheduler.AddJob(emptyFridgeJob, true, CancellationToken.None);
+
+        await Scheduler.Invoking(x => x.AddJob(emptyFridgeJob, true, CancellationToken.None))
+            .Should().NotThrowAsync();
+    }
 }

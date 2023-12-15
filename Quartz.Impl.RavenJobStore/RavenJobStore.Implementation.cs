@@ -148,11 +148,11 @@ public partial class RavenJobStore
         var jobToStore = new Job(newJob, InstanceName);
 
         await session
-            .StoreAsync(triggerToStore, triggerToStore.Id, token)
+            .StoreAsync(triggerToStore, null, triggerToStore.Id, token)
             .ConfigureAwait(false);
 
         await session
-            .StoreAsync(jobToStore, jobToStore.Id, token)
+            .StoreAsync(jobToStore, null, jobToStore.Id, token)
             .ConfigureAwait(false);
 
         await session
@@ -204,7 +204,9 @@ public partial class RavenJobStore
 
         var job = new Job(newJob, InstanceName);
 
-        await session.StoreAsync(job, job.Id, token).ConfigureAwait(false);
+        // We need to provide the change vector in the case of optimistic
+        // concurrency to force overwriting of existing documents,
+        await session.StoreAsync(job, null, job.Id, token).ConfigureAwait(false);
         await session.SaveChangesAsync(token).ConfigureAwait(false);
         
         TraceExit(Logger);
@@ -408,7 +410,7 @@ public partial class RavenJobStore
         var trigger = await CreateConfiguredTriggerAsync(newTrigger, session, token);
 
         await session
-            .StoreAsync(trigger, trigger.Id, token)
+            .StoreAsync(trigger, null, trigger.Id, token)
             .ConfigureAwait(false);
         
         await session
@@ -570,7 +572,7 @@ public partial class RavenJobStore
             session, token).ConfigureAwait(false);
 
         await session
-            .StoreAsync(triggerToStore, triggerToStore.Id, token)
+            .StoreAsync(triggerToStore, null, triggerToStore.Id, token)
             .ConfigureAwait(false);
 
         await session
@@ -730,6 +732,8 @@ public partial class RavenJobStore
         await session.StoreAsync
         (
             calendarToStore,
+            null,
+            calendarToStore.Id,
             token
         );
 

@@ -1,4 +1,5 @@
 using Raven.Client.Documents;
+using Raven.Client.Documents.Conventions;
 using Raven.TestDriver;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
@@ -12,6 +13,11 @@ public abstract class TestBase : RavenTestDriver
             FrameworkVersion = "7.0.x",
             GracefulShutdownTimeout = TimeSpan.FromMinutes(1)
         });
+    }
+
+    protected override void PreInitialize(IDocumentStore documentStore)
+    {
+        documentStore.Conventions.UseOptimisticConcurrency = true;
     }
 
     protected IDocumentStore CreateStore()

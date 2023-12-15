@@ -62,6 +62,8 @@ public class UtilsTests : TestBase
 
             await session.SaveChangesAsync();
         }
+        
+        WaitForIndexing(Target.DocumentStore);
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
