@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <TargetFrameworks>net7.0;net6.0</TargetFrameworks>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Version>0.5.0-prerelease</Version>
+        <Version>0.6.0-prerelease</Version>
         <Title>Quartz Job store using RavenDB</Title>
         <Authors>Uwe Laas</Authors>
         <PackageProjectUrl>https://github.com/JezhikLaas/quartznet-RavenJobStore</PackageProjectUrl>

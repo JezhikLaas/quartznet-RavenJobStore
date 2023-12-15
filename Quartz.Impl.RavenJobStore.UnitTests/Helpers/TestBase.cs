@@ -1,5 +1,4 @@
 using Raven.Client.Documents;
-using Raven.Client.Documents.Conventions;
 using Raven.TestDriver;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests.Helpers;
