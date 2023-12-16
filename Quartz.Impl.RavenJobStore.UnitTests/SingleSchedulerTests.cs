@@ -261,4 +261,60 @@ public class SingleSchedulerTests : SchedulerTestBase
         await Scheduler.Invoking(x => x.AddJob(emptyFridgeJob, true, CancellationToken.None))
             .Should().NotThrowAsync();
     }
+
+    [Fact(DisplayName = "If a non durable and non concurrent job completes Then it gets deleted")]
+    public async Task If_a_non_durable_and_non_concurrent_job_completes_Then_it_gets_deleted()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+        
+        var job = new JobDetailImpl("Job", "Group", typeof(NonConcurrentJob));
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, triggerOne, CancellationToken.None);
+
+        var existingJobs = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+        var counter = 50;
+        while (--counter > 0 && existingJobs.Any())
+        {
+            await Task.Delay(50);
+            existingJobs = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+        }
+
+        existingJobs.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If a persistent job completes Then it gets deleted")]
+    public async Task If_a_persistent_job_completes_Then_it_gets_deleted()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test", collectionName: "SchedulerData");
+        await Scheduler.Start();
+        
+        var job = new JobDetailImpl("Job", "Group", typeof(PersistentJob));
+
+        var triggerOne = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithPriority(1)
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, triggerOne, CancellationToken.None);
+
+        var existingJobs = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+        var counter = 50;
+        while (--counter > 0 && existingJobs.Any())
+        {
+            await Task.Delay(50);
+            existingJobs = await Scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
+        }
+
+        existingJobs.Should().HaveCount(0);
+    }
 }

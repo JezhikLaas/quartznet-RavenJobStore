@@ -1,6 +1,7 @@
 namespace Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 
 [PersistJobDataAfterExecution]
+[DisallowConcurrentExecution]
 public class PersistentJob : IJob
 {
     public string? TestProperty { get; set; }
@@ -9,7 +10,7 @@ public class PersistentJob : IJob
     {
         if (string.IsNullOrEmpty(TestProperty))
         {
-            context.MergedJobDataMap[nameof(TestProperty)] = "Failed";
+            context.JobDetail.JobDataMap[nameof(TestProperty)] = "Failed";
         }
         else
         {

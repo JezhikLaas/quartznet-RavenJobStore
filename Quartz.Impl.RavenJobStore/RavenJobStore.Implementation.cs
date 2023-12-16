@@ -331,7 +331,10 @@ public partial class RavenJobStore
             return false;
         }
 
-        session.Delete(jobKey.GetDatabaseId(InstanceName));
+        var jobId = jobKey.GetDatabaseId(InstanceName);
+        
+        session.Delete(jobId);
+        session.Delete(BlockedJob.GetId(InstanceName, jobId));
 
         await session
             .SaveChangesAsync(token)
@@ -349,7 +352,10 @@ public partial class RavenJobStore
 
         foreach (var jobKey in jobKeys)
         {
-            session.Delete(jobKey.GetDatabaseId(InstanceName));
+            var jobId = jobKey.GetDatabaseId(InstanceName);
+        
+            session.Delete(BlockedJob.GetId(InstanceName, jobId));
+            session.Delete(jobId);
         }
 
         await session
@@ -859,7 +865,7 @@ public partial class RavenJobStore
 
     internal async Task<IReadOnlyCollection<JobKey>> GetJobKeysAsync(
         GroupMatcher<JobKey> matcher,
-            CancellationToken token)
+        CancellationToken token)
     {
         TraceEnter(Logger);
 
@@ -871,7 +877,7 @@ public partial class RavenJobStore
             .Query<Job>(nameof(JobIndex))
             .Where(x => x.Scheduler == InstanceName)
             .ProjectInto<JobKey>();
-
+        
         await using var stream = await session
             .Advanced
             .StreamAsync(query, token)
@@ -1690,6 +1696,7 @@ public partial class RavenJobStore
         var signalAfterSaveOne = await ProcessCompletedJobAsync
         (
             session,
+            triggerInstCode,
             jobDetail,
             job,
             token
@@ -1698,11 +1705,9 @@ public partial class RavenJobStore
         var signalAfterSaveTwo = await ProcessTriggerInstructionAsync
         (
             session,
-            trigger,
             triggerInstCode,
-            entry,
-            token
-        ).ConfigureAwait(false);
+            trigger,
+            entry, token).ConfigureAwait(false);
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
 
@@ -1718,6 +1723,7 @@ public partial class RavenJobStore
 
     private async Task<bool> ProcessCompletedJobAsync(
         IAsyncDocumentSession session,
+        SchedulerInstruction triggerInstCode,
         IJobDetail jobDetail,
         Job? job,
         CancellationToken token)
@@ -1725,6 +1731,10 @@ public partial class RavenJobStore
         session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
 
         if (job == null) return false;
+        if (triggerInstCode == SchedulerInstruction.DeleteTrigger)
+        {
+            if (job.Durable == false) return false;
+        }
         
         if (jobDetail.PersistJobDataAfterExecution) job.Item = jobDetail;
 
@@ -1753,16 +1763,17 @@ public partial class RavenJobStore
         }
 
         return true;
-
     }
 
     private async Task<bool> ProcessTriggerInstructionAsync(
         IAsyncDocumentSession session,
-        IMutableTrigger mutableTrigger,
         SchedulerInstruction triggerInstCode,
+        IMutableTrigger mutableTrigger,
         Trigger trigger,
         CancellationToken token)
     {
+        Logger.LogDebug("Processing {Instruction} for {Trigger}", triggerInstCode, trigger.Id);
+        
         switch (triggerInstCode)
         {
             case SchedulerInstruction.ReExecuteJob:
@@ -1776,7 +1787,7 @@ public partial class RavenJobStore
             case SchedulerInstruction.DeleteTrigger:
             {
                 // Deleting triggers
-                var triggerId = mutableTrigger.Key.GetDatabaseId(InstanceName);
+                var triggerId = trigger.Id;
                 var nextFireTime = mutableTrigger.GetNextFireTimeUtc();
                 if (nextFireTime.HasValue == false)
                 {

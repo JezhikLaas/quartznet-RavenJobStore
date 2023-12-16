@@ -3143,4 +3143,36 @@ public class ImplementationTests : TestBase
                 }
             );
     }
+
+    [Fact(DisplayName = "If a blocked job is removed Then the block is removed as well")]
+    public async Task If_a_blocked_job_is_removed_Then_the_block_is_removed_as_well()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            await arrangeSession.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName,
+                    job.Key.GetDatabaseId(Target.InstanceName))
+            );
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        await Target.RemoveJobAsync(job.Key, CancellationToken.None);
+        
+        using (var session = Target.DocumentStore!.OpenAsyncSession())
+        {
+            var blockedJobExists = await session.Advanced.ExistsAsync
+            (
+                BlockedJob.GetId(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName)),
+                CancellationToken.None
+            );
+            
+            blockedJobExists.Should().BeFalse();
+        }
+    }
 }
