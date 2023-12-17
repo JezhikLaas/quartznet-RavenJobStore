@@ -552,11 +552,11 @@ public partial class RavenJobStore
         
         using var session = GetSession();
 
-        var triggerExists = await session.Advanced
-            .ExistsAsync(triggerKey.GetDatabaseId(InstanceName), token)
+        var existingTrigger = await session
+            .LoadAsync<Trigger>(triggerKey.GetDatabaseId(InstanceName), token)
             .ConfigureAwait(false);
 
-        if (triggerExists == false)
+        if (existingTrigger == null)
         {
             TraceExit(Logger, false);
             return false;
@@ -571,11 +571,20 @@ public partial class RavenJobStore
             TraceExit(Logger, nameof(JobPersistenceException));
             throw new JobPersistenceException($"The job ({newTrigger.JobKey}) referenced by the trigger does not exist.");
         }
-        
+
         var triggerToStore = await CreateConfiguredTriggerAsync
         (
             newTrigger,
-            session, token).ConfigureAwait(false);
+            session, token
+        ).ConfigureAwait(false);
+
+        // In case the existing trigger is the one
+        // which blocked the job and other triggers
+        // the new one will be created blocked but
+        // the truth is, it must be unblocked.
+        triggerToStore.State = existingTrigger.State;
+        
+        session.Advanced.Evict(existingTrigger);
 
         await session
             .StoreAsync(triggerToStore, null, triggerToStore.Id, token)

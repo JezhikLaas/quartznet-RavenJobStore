@@ -3175,4 +3175,33 @@ public class ImplementationTests : TestBase
             blockedJobExists.Should().BeFalse();
         }
     }
+
+    [Fact(DisplayName = "If a job is blocked Then triggers referring to others are not affected")]
+    public async Task If_a_job_is_blocked_Then_triggers_referring_to_others_are_not_affected()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job-BusinessTransactions/InvoiceToIntercompany-DispatchToIntercompany-dispatch", "Group", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
+        {
+            await arrangeSession.StoreAsync
+            (
+                new BlockedJob(Target.InstanceName,
+                    job.Key.GetDatabaseId(Target.InstanceName))
+            );
+            await arrangeSession.SaveChangesAsync();
+        }
+
+        using var session = Target.DocumentStore!.OpenAsyncSession();
+        var result = await Target.IsJobBlockedAsync
+        (
+            session,
+            new JobKey("Job-BusinessTransactions/InvoiceToIntercompany-DispatchToIntercompany", "Group").GetDatabaseId(Target.InstanceName),
+            CancellationToken.None
+        );
+
+        result.Should().BeFalse();
+    }
 }

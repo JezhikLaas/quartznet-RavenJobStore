@@ -6,6 +6,7 @@ using Quartz.Impl.Matchers;
 using Quartz.Impl.RavenJobStore.UnitTests.Helpers;
 using Quartz.Impl.RavenJobStore.UnitTests.Jobs;
 using Quartz.Spi;
+using Raven.Client.Documents;
 using Raven.Client.Exceptions;
 
 namespace Quartz.Impl.RavenJobStore.UnitTests;
@@ -316,5 +317,81 @@ public class SingleSchedulerTests : SchedulerTestBase
         }
 
         existingJobs.Should().HaveCount(0);
+    }
+
+    [Fact(DisplayName = "If a durable job terminates itself Then no orphaned blocks remain")]
+    public async Task If_a_durable_job_terminates_itself_Then_no_orphaned_blocks_remain()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test");
+        await Scheduler.Start();
+
+        var watcher = new ControllingWatcher(Scheduler.SchedulerInstanceId, SchedulerExecutionStep.Completing);
+
+        var store = GetStore(Scheduler);
+        store.DebugWatcher = watcher;
+        
+        var job = JobBuilder
+            .Create(typeof(TerminatingJob))
+            .WithIdentity("Job", "Group")
+            .StoreDurably()
+            .Build();
+
+        var trigger = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithSimpleSchedule(schedule => schedule
+                .WithInterval(TimeSpan.FromSeconds(10))
+                .RepeatForever()
+            )
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, trigger, CancellationToken.None);
+        
+        watcher.WaitForEvent(TimeSpan.FromSeconds(15));
+
+        using var session = store.DocumentStore.ThrowIfNull().OpenAsyncSession();
+
+        var counter = 10;
+        var block = await session.Query<BlockedJob>().AnyAsync();
+        while (counter-- > 0 && block)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(0.1));
+            block = await session.Query<BlockedJob>().AnyAsync();
+        }
+
+        counter.Should().BeGreaterThan(0);
+    }
+
+    [Fact(DisplayName = "If a non concurrent job reschedules itself Then the replaced trigger is not blocked")]
+    public async Task If_a_non_concurrent_job_reschedules_itself_Then_the_replaced_trigger_is_not_blocked()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test");
+        await Scheduler.Start();
+
+        var watcher = new ControllingWatcher(Scheduler.SchedulerInstanceId, SchedulerExecutionStep.Completing);
+
+        var store = GetStore(Scheduler);
+        store.DebugWatcher = watcher;
+        
+        var job = JobBuilder
+            .Create(typeof(SelfReplacingJob))
+            .WithIdentity("Job", "Group")
+            .StoreDurably()
+            .Build();
+
+        var trigger = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, trigger, CancellationToken.None);
+        
+        watcher.WaitForEvent(TimeSpan.FromSeconds(15));
+
+        var state = await Scheduler.GetTriggerState(trigger.Key, CancellationToken.None);
+
+        state.Should().NotBe(TriggerState.Blocked);
     }
 }

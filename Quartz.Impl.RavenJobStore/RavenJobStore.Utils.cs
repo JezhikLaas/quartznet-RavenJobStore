@@ -349,7 +349,7 @@ public partial class RavenJobStore
         return trigger;
     }
 
-    private Task<bool> IsJobBlockedAsync(IAsyncDocumentSession session, string jobId, CancellationToken token) =>
+    internal Task<bool> IsJobBlockedAsync(IAsyncDocumentSession session, string jobId, CancellationToken token) =>
         session.Advanced.ExistsAsync(BlockedJob.GetId(InstanceName, jobId), token);
 
     internal async Task<IReadOnlyList<string>> GetBlockedJobsAsync
