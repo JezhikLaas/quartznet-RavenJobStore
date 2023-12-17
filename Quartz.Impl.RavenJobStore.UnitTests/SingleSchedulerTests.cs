@@ -364,6 +364,49 @@ public class SingleSchedulerTests : SchedulerTestBase
         counter.Should().BeGreaterThan(0);
     }
 
+    [Fact(DisplayName = "If a non-durable job terminates itself Then no orphaned blocks remain")]
+    public async Task If_a_non_durable_job_terminates_itself_Then_no_orphaned_blocks_remain()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test");
+        await Scheduler.Start();
+
+        var watcher = new ControllingWatcher(Scheduler.SchedulerInstanceId, SchedulerExecutionStep.Completed);
+
+        var store = GetStore(Scheduler);
+        store.DebugWatcher = watcher;
+        
+        var job = JobBuilder
+            .Create(typeof(TerminatingJob))
+            .WithIdentity("Job", "Group")
+            .Build();
+
+        var trigger = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .WithSimpleSchedule(schedule => schedule
+                .WithInterval(TimeSpan.FromSeconds(1))
+                .RepeatForever()
+            )
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, trigger, CancellationToken.None);
+        
+        watcher.WaitForEvent(TimeSpan.FromSeconds(15));
+
+        using var session = store.DocumentStore.ThrowIfNull().OpenAsyncSession();
+
+        var counter = 10;
+        var block = await session.Query<BlockedJob>().AnyAsync();
+        while (counter-- > 0 && block)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(0.1));
+            block = await session.Query<BlockedJob>().AnyAsync();
+        }
+
+        counter.Should().BeGreaterThan(0);
+    }
+
     [Fact(DisplayName = "If a non concurrent job reschedules itself Then the replaced trigger is not blocked")]
     public async Task If_a_non_concurrent_job_reschedules_itself_Then_the_replaced_trigger_is_not_blocked()
     {

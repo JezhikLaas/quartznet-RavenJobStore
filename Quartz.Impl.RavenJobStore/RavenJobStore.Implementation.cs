@@ -459,7 +459,9 @@ public partial class RavenJobStore
 
         if (triggersForJob.Count == 1 && job.Durable == false)
         {
+            session.Delete(BlockedJob.GetId(InstanceName, job.Id));
             session.Delete(job.Id);
+
             await Signaler.NotifySchedulerListenersJobDeleted(job.JobKey, token).ConfigureAwait(false);
         }
         
@@ -1600,6 +1602,8 @@ public partial class RavenJobStore
             .LoadAsync<Trigger>(triggerKeys, token)
             .ConfigureAwait(false);
 
+        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+
         foreach (var (_, storedTrigger) in storedTriggers)
         {
             if (storedTrigger?.State != InternalTriggerState.Acquired)
@@ -1608,7 +1612,7 @@ public partial class RavenJobStore
                 result.Add(new TriggerFiredResult(new RavenDbException("Trigger is not acquired")));
                 continue;
             }
-            var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
+            var isJobBlocked = blockedJobs.Contains(storedTrigger.JobId);
             if (isJobBlocked)
             {
                 // This should force Quartz to release this
