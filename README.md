@@ -7,7 +7,13 @@
 JobStore implementation for Quartz.NET scheduler using RavenDB.<br>
 Not exactly a fork of, but inspired by [Quartz.NET-RavenDB](https://github.com/ravendb/quartznet-RavenDB)
 
-First prerelease available on nuget.
+First prerelease(s) available on nuget.
+
+__Please note that this package is still not production ready and contains bugs!__
+
+These prerelease packages help us to test the code in real world projects and 
+we would be very grateful if others could do some tests, too. Please use the
+issue tracker if you encounter any problems. 
 
 ## About
 

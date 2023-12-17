@@ -2649,8 +2649,8 @@ public class ImplementationTests : TestBase
         stateTwo.Should().Be(InternalTriggerState.Acquired);
     }
 
-    [Fact(DisplayName = "If an acquired and blocked trigger is released Then it gets back to blocked")]
-    public async Task If_an_acquired_and_blocked_trigger_is_released_Then_it_gets_back_to_blocked()
+    [Fact(DisplayName = "If an acquired and blocked trigger is released Then it gets back to waiting")]
+    public async Task If_an_acquired_and_blocked_trigger_is_released_Then_it_gets_back_to_waiting()
     {
         await Target.SchedulerStartedAsync(CancellationToken.None);
 
@@ -2698,7 +2698,7 @@ public class ImplementationTests : TestBase
         var storedTriggerOne = await session.LoadAsync<Trigger>(triggerOne.Key.GetDatabaseId(Target.InstanceName));
         var stateOne = storedTriggerOne.State;
 
-        stateOne.Should().Be(InternalTriggerState.Blocked);
+        stateOne.Should().Be(InternalTriggerState.Waiting);
     }
 
     [Fact(DisplayName = "If two triggers fire the same non concurrent job Then only one is executed")]

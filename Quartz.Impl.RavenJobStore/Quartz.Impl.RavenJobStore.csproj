@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <TargetFrameworks>net7.0;net6.0</TargetFrameworks>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Version>0.8.0-prerelease</Version>
+        <Version>0.9.0-prerelease</Version>
         <Title>Quartz Job store using RavenDB</Title>
         <Authors>Uwe Laas</Authors>
         <PackageProjectUrl>https://github.com/JezhikLaas/quartznet-RavenJobStore</PackageProjectUrl>
@@ -19,7 +19,10 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <RootNamespace>Domla.Quartz.Raven</RootNamespace>
         <PackageIcon>crow.png</PackageIcon>
-        <PackageReleaseNotes>* 0.8
+        <PackageReleaseNotes>* 0.9
+Fixes a bug which sets a trigger to be blocked unexpectedly.
+
+* 0.8
 Fixes a bug occuring when a non concurrent job re-schedules itself. 
 
 * 0.7

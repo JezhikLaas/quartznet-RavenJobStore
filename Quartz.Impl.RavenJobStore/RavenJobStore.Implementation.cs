@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
@@ -581,8 +580,18 @@ public partial class RavenJobStore
         // In case the existing trigger is the one
         // which blocked the job and other triggers
         // the new one will be created blocked but
-        // the truth is, it must be unblocked.
-        triggerToStore.State = existingTrigger.State;
+        // the truth is, it must be waiting in most cases.
+
+        var shouldBeWaitingAgain = existingTrigger.State is not
+        (
+            InternalTriggerState.Blocked 
+            or
+            InternalTriggerState.PausedAndBlocked
+            or
+            InternalTriggerState.Paused
+        );
+
+        if (shouldBeWaitingAgain) triggerToStore.State = InternalTriggerState.Waiting;
         
         session.Advanced.Evict(existingTrigger);
 
@@ -1564,11 +1573,7 @@ public partial class RavenJobStore
             return;
         }
 
-        var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
-
-        storedTrigger.State = isJobBlocked
-            ? InternalTriggerState.Blocked
-            : InternalTriggerState.Waiting;
+        storedTrigger.State = InternalTriggerState.Waiting;
 
         await session.SaveChangesAsync(token).ConfigureAwait(false);
         
@@ -1597,12 +1602,18 @@ public partial class RavenJobStore
 
         foreach (var (_, storedTrigger) in storedTriggers)
         {
-            if (storedTrigger?.State != InternalTriggerState.Acquired) continue;
+            if (storedTrigger?.State != InternalTriggerState.Acquired)
+            {
+                Logger.LogDebug("Trigger {Id} is not acquired, skipping it", storedTrigger?.Id);
+                result.Add(new TriggerFiredResult(new RavenDbException("Trigger is not acquired")));
+                continue;
+            }
             var isJobBlocked = await IsJobBlockedAsync(session, storedTrigger.JobId, token).ConfigureAwait(false);
             if (isJobBlocked)
             {
                 // This should force Quartz to release this
                 // trigger and do the next round of processing.
+                Logger.LogDebug("Job {Id} is blocked, skipping it", storedTrigger.JobId);
                 result.Add(new TriggerFiredResult(new RavenDbException("Job is blocked")));
                 continue;
             }
@@ -1621,6 +1632,8 @@ public partial class RavenJobStore
 
             if (storedJob == null)
             {
+                // Just in case ...
+                session.Delete(BlockedJob.GetId(InstanceName, storedTrigger.JobId));
                 // This should force Quartz to release this
                 // trigger and do the next round of processing.
                 result.Add(new TriggerFiredResult(new RavenDbException("Job has been deleted")));
@@ -1660,6 +1673,7 @@ public partial class RavenJobStore
                     };
                 }
 
+                Logger.LogDebug("Setting job {Id} to be blocked", storedTrigger.JobId);
                 await session
                     .StoreAsync(new BlockedJob(InstanceName, storedTrigger.JobId), token)
                     .ConfigureAwait(false);
@@ -1861,7 +1875,7 @@ public partial class RavenJobStore
     }
 }
 
-public class RavenDbException : DbException
+public class RavenDbException : Exception
 {
     public RavenDbException(string message)
         : base(message)
