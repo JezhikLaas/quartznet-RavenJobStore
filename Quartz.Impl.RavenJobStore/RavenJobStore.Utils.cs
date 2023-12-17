@@ -420,32 +420,34 @@ public partial class RavenJobStore
         result.ForEach(x => buffer.Enqueue(x, -x.Priority));
     }
 
-    private void WaitForIndexing()
+    private async Task WaitForIndexingAsync(params string[] names)
     {
         var operationExecutor = DocumentStore!.Maintenance.ForDatabase(DocumentStore!.Database);
         var timeout = TimeSpan.FromSeconds(SecondsToWaitForIndexing);
         var stopwatch = Stopwatch.StartNew();
+        var checkAll = names.Any() == false;
         
         while (stopwatch.Elapsed < timeout)
         {
-            var databaseStatistics = operationExecutor.Send(new GetStatisticsOperation());
+            var databaseStatistics = await operationExecutor
+                .SendAsync(new GetStatisticsOperation())
+                .ConfigureAwait(false);
             var done = databaseStatistics
                 .Indexes
-                .Where<IndexInformation>(x => x.State != IndexState.Disabled)
+                .Where
+                (
+                    x => x.State != IndexState.Disabled && (checkAll || names.Contains(x.Name))
+                )
                 .All
                 (
-                    (Func<IndexInformation, bool>)(x => x.IsStale == false
-                                                        &&
-                                                        x.Name.StartsWith("ReplacementOf/") == false)
+                    x => x.IsStale == false && x.Name.StartsWith("ReplacementOf/") == false
                 );
             
             if (done) return;
 
-            if (databaseStatistics.Indexes.All(x => x.State != IndexState.Error))
-            {
-                Thread.Sleep(100);
-            }
-            else break;
+            if (databaseStatistics.Indexes.Any(x => x.State == IndexState.Error)) break;
+
+            await Task.Delay(100).ConfigureAwait(false);
         }
     }
 

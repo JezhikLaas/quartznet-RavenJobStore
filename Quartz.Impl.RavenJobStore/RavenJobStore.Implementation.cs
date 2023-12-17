@@ -889,7 +889,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        WaitForIndexing();
+        await WaitForIndexingAsync(nameof(JobIndex)).ConfigureAwait(false);
 
         using var session = GetNonWaitingSession();
         
@@ -921,7 +921,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        WaitForIndexing();
+        await WaitForIndexingAsync(nameof(TriggerIndex)).ConfigureAwait(false);
 
         using var session = GetNonWaitingSession();
         
@@ -1132,7 +1132,7 @@ public partial class RavenJobStore
     {
         TraceEnter(Logger);
 
-        WaitForIndexing();
+        await WaitForIndexingAsync(nameof(TriggerIndex)).ConfigureAwait(false);
 
         using var session = GetNonWaitingSession();
         using var updateSession = GetSession();
