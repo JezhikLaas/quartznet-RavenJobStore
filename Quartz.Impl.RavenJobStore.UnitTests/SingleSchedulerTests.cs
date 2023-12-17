@@ -394,4 +394,36 @@ public class SingleSchedulerTests : SchedulerTestBase
 
         state.Should().NotBe(TriggerState.Blocked);
     }
+
+    [Fact(DisplayName = "If a non concurrent job pauses itself Then the replaced trigger is paused")]
+    public async Task If_a_non_concurrent_job_pauses_itself_Then_the_replaced_trigger_is_paused()
+    {
+        Scheduler = await CreateSingleSchedulerAsync("Test");
+        await Scheduler.Start();
+
+        var watcher = new ControllingWatcher(Scheduler.SchedulerInstanceId, SchedulerExecutionStep.Completing);
+
+        var store = GetStore(Scheduler);
+        store.DebugWatcher = watcher;
+        
+        var job = JobBuilder
+            .Create(typeof(SelfPausingJob))
+            .WithIdentity("Job", "Group")
+            .StoreDurably()
+            .Build();
+
+        var trigger = (IOperableTrigger)TriggerBuilder.Create()
+            .WithIdentity("Trigger", "Group")
+            .StartNow()
+            .ForJob(job)
+            .Build();
+
+        await Scheduler.ScheduleJob(job, trigger, CancellationToken.None);
+        
+        watcher.WaitForEvent(TimeSpan.FromSeconds(15));
+
+        var state = await Scheduler.GetTriggerState(trigger.Key, CancellationToken.None);
+
+        state.Should().Be(TriggerState.Paused);
+    }
 }
