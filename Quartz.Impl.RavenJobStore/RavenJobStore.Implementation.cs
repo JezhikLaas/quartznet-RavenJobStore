@@ -708,18 +708,13 @@ public partial class RavenJobStore
             select calendar.Id
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var blockedJobs = await (
-            from blockedJob in session.Query<BlockedJob>(nameof(BlockedJobIndex))
-            where blockedJob.Scheduler == InstanceName
-            select blockedJob.Id
-        ).ToListAsync(token).ConfigureAwait(false);
+        await BlockRepository!.ReleaseAllJobsAsync(session, token);
 
         triggers.ForEach(x => session.Delete(x));
         jobs.ForEach(x => session.Delete(x));
         pausedTriggerGroups.ForEach(x => session.Delete(x));
         pausedJobGroups.ForEach(x => session.Delete(x));
         calendars.ForEach(x => session.Delete(x));
-        blockedJobs.ForEach(x => session.Delete(x));
 
         await session
             .SaveChangesAsync(token)
