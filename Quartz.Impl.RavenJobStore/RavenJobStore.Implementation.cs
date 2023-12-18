@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
-using Domla.Quartz.Raven.ConcreteStrategies;
 using Domla.Quartz.Raven.Entities;
 using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
