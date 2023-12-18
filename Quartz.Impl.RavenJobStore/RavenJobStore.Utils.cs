@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Domla.Quartz.Raven.ConcreteStrategies;
 using Domla.Quartz.Raven.Entities;
 using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,11 @@ namespace Domla.Quartz.Raven;
 
 public partial class RavenJobStore
 {
+    private void EnsureBlockRepository() =>
+        BlockRepository ??= Clustered
+            ? new PersistentBlockRepository(InstanceName)
+            : new MemoryBlockRepository();
+
     private IAsyncDocumentSession GetNonWaitingSession() =>
         DocumentStore.ThrowIfNull().OpenAsyncSession();
     

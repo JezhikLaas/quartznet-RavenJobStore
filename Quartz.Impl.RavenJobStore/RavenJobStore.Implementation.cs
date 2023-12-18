@@ -63,11 +63,8 @@ public partial class RavenJobStore
         };
 
         store.Initialize();
+        EnsureBlockRepository();
 
-        BlockRepository = Clustered
-            ? new PersistentBlockRepository(InstanceName)
-            : new MemoryBlockRepository();
-        
         return store;
     }
     
@@ -77,6 +74,7 @@ public partial class RavenJobStore
         
         Logger.LogDebug("Scheduler started at {PointInTime}", SystemTime.UtcNow());
 
+        EnsureBlockRepository();
         using var session = GetSession();
 
         var exists = await session.Advanced.ExistsAsync(InstanceName, token);

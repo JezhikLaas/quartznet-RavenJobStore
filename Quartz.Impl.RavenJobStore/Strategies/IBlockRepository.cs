@@ -6,6 +6,7 @@ internal interface IBlockRepository
 {
     Task BlockJobAsync(IAsyncDocumentSession session, string jobId, CancellationToken token);
     
+    // ReSharper disable once UnusedParameter.Global
     Task ReleaseJobAsync(IAsyncDocumentSession session, string jobId, CancellationToken token);
     
     Task<bool> IsJobBlockedAsync(IAsyncDocumentSession session, string jobId, CancellationToken token);
