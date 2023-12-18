@@ -25,8 +25,6 @@ namespace Domla.Quartz.Raven;
 
 public partial class RavenJobStore
 {
-    //internal static RavenJobStore? Instance;
-
     public RavenJobStore()
     {
         Logger = LoggerFactory != null
