@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <TargetFrameworks>net7.0;net6.0</TargetFrameworks>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <Version>1.0.0-beta.2</Version>
+        <Version>1.0.0-beta.3</Version>
         <Title>Quartz Job store using RavenDB</Title>
         <Authors>Uwe Laas</Authors>
         <PackageProjectUrl>https://github.com/JezhikLaas/quartznet-RavenJobStore</PackageProjectUrl>
@@ -19,7 +19,10 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <RootNamespace>Domla.Quartz.Raven</RootNamespace>
         <PackageIcon>crow.png</PackageIcon>
-        <PackageReleaseNotes>* 1.0 - beta.2
+        <PackageReleaseNotes>* 1.0-bet.3
+Uses in-memory blocks for non-clustered schedulers to improve performance.
+
+* 1.0 - beta.2
 Waiting for indexes before streaming seems to be a performance killer - try to wait only for the needed index(es).
 
 * 1.0 - beta.1

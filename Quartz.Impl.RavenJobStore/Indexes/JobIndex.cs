@@ -15,14 +15,3 @@ internal class JobIndex : AbstractIndexCreationTask<Job>
             };
     }
 }
-internal class BlockedJobIndex : AbstractIndexCreationTask<BlockedJob>
-{
-    internal BlockedJobIndex()
-    {
-        Map = blockedJobs => from blockedJob in blockedJobs
-            select new
-            {
-                blockedJob.Scheduler
-            };
-    }
-}

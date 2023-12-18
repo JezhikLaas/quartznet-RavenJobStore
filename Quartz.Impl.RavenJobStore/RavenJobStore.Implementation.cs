@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
+using Domla.Quartz.Raven.ConcreteStrategies;
 using Domla.Quartz.Raven.Entities;
 using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
@@ -63,6 +64,10 @@ public partial class RavenJobStore
 
         store.Initialize();
 
+        BlockRepository = Clustered
+            ? new PersistentBlockRepository(InstanceName)
+            : new MemoryBlockRepository();
+        
         return store;
     }
     
@@ -71,7 +76,7 @@ public partial class RavenJobStore
         TraceEnter(Logger);
         
         Logger.LogDebug("Scheduler started at {PointInTime}", SystemTime.UtcNow());
-        
+
         using var session = GetSession();
 
         var exists = await session.Advanced.ExistsAsync(InstanceName, token);
@@ -282,7 +287,7 @@ public partial class RavenJobStore
                                       ||
                                       pausedJobGroups.Contains(trigger.JobKey.Group);
 
-                var isJobBlocked = await IsJobBlockedAsync
+                var isJobBlocked = await BlockRepository!.IsJobBlockedAsync
                 (
                     session,
                     trigger.JobKey.GetDatabaseId(InstanceName),
@@ -333,7 +338,7 @@ public partial class RavenJobStore
         var jobId = jobKey.GetDatabaseId(InstanceName);
         
         session.Delete(jobId);
-        session.Delete(BlockedJob.GetId(InstanceName, jobId));
+        await BlockRepository!.ReleaseJobAsync(session, jobId, token).ConfigureAwait(false);
 
         await session
             .SaveChangesAsync(token)
@@ -353,7 +358,7 @@ public partial class RavenJobStore
         {
             var jobId = jobKey.GetDatabaseId(InstanceName);
         
-            session.Delete(BlockedJob.GetId(InstanceName, jobId));
+            await BlockRepository!.ReleaseJobAsync(session, jobId, token).ConfigureAwait(false);
             session.Delete(jobId);
         }
 
@@ -459,7 +464,7 @@ public partial class RavenJobStore
 
         if (triggersForJob.Count == 1 && job.Durable == false)
         {
-            session.Delete(BlockedJob.GetId(InstanceName, job.Id));
+            await BlockRepository!.ReleaseJobAsync(session, job.Id, token).ConfigureAwait(false);
             session.Delete(job.Id);
 
             await Signaler.NotifySchedulerListenersJobDeleted(job.JobKey, token).ConfigureAwait(false);
@@ -1074,7 +1079,7 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
         
-        var isJobBlocked = await IsJobBlockedAsync
+        var isJobBlocked = await BlockRepository!.IsJobBlockedAsync
         (
             session,
             trigger.JobId,
@@ -1271,13 +1276,12 @@ public partial class RavenJobStore
         if (trigger == null) return;
         if (trigger.State is not InternalTriggerState.Paused and not InternalTriggerState.PausedAndBlocked) return;
 
-        var isJobBlocked = await IsJobBlockedAsync
+        var isJobBlocked = await BlockRepository!.IsJobBlockedAsync
         (
             session,
             trigger.JobId,
             token
         ).ConfigureAwait(false);
-
 
         trigger.State = isJobBlocked
             ? InternalTriggerState.Blocked
@@ -1305,7 +1309,9 @@ public partial class RavenJobStore
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+        var blockedJobs = await BlockRepository!
+            .GetBlockedJobsAsync(session, token)
+            .ConfigureAwait(false);
 
         var result = new HashSet<string>();
 
@@ -1355,7 +1361,9 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
-        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+        var blockedJobs = await BlockRepository!
+            .GetBlockedJobsAsync(session, token)
+            .ConfigureAwait(false);
 
         foreach (var trigger in triggers)
         {
@@ -1386,7 +1394,9 @@ public partial class RavenJobStore
             select trigger
         ).ToListAsync(token).ConfigureAwait(false);
 
-        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+        var blockedJobs = await BlockRepository!
+            .GetBlockedJobsAsync(session, token)
+            .ConfigureAwait(false);
 
         foreach (var trigger in triggers)
         {
@@ -1443,7 +1453,9 @@ public partial class RavenJobStore
             token
         ).ConfigureAwait(false);
 
-        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+        var blockedJobs = await BlockRepository!
+            .GetBlockedJobsAsync(session, token)
+            .ConfigureAwait(false);
 
         foreach (var trigger in triggers)
         {
@@ -1602,7 +1614,9 @@ public partial class RavenJobStore
             .LoadAsync<Trigger>(triggerKeys, token)
             .ConfigureAwait(false);
 
-        var blockedJobs = await GetBlockedJobsAsync(session, token).ConfigureAwait(false);
+        var blockedJobs = await BlockRepository!
+            .GetBlockedJobsAsync(session, token)
+            .ConfigureAwait(false);
 
         foreach (var (_, storedTrigger) in storedTriggers)
         {
@@ -1637,7 +1651,9 @@ public partial class RavenJobStore
             if (storedJob == null)
             {
                 // Just in case ...
-                session.Delete(BlockedJob.GetId(InstanceName, storedTrigger.JobId));
+                await BlockRepository!
+                    .ReleaseJobAsync(session, storedTrigger.JobId, token)
+                    .ConfigureAwait(false);
                 // This should force Quartz to release this
                 // trigger and do the next round of processing.
                 result.Add(new TriggerFiredResult(new RavenDbException("Job has been deleted")));
@@ -1678,8 +1694,8 @@ public partial class RavenJobStore
                 }
 
                 Logger.LogDebug("Setting job {Id} to be blocked", storedTrigger.JobId);
-                await session
-                    .StoreAsync(new BlockedJob(InstanceName, storedTrigger.JobId), token)
+                await BlockRepository!
+                    .BlockJobAsync(session, storedTrigger.JobId, token)
                     .ConfigureAwait(false);
             }
 
@@ -1755,7 +1771,9 @@ public partial class RavenJobStore
         Job? job,
         CancellationToken token)
     {
-        session.Delete(BlockedJob.GetId(InstanceName, jobDetail.Key.GetDatabaseId(InstanceName)));
+        await BlockRepository!
+            .ReleaseJobAsync(session, jobDetail.Key.GetDatabaseId(InstanceName), token)
+            .ConfigureAwait(false);
 
         if (job == null) return false;
         if (triggerInstCode == SchedulerInstruction.DeleteTrigger)

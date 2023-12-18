@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Domla.Quartz.Raven.Strategies;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
@@ -143,4 +144,6 @@ public partial class RavenJobStore
     internal ILogger<RavenJobStore> Logger { get; set; } = NullLoggerFactory.Instance.CreateLogger<RavenJobStore>();
     
     internal IDebugWatcher? DebugWatcher { get; set; }
+
+    internal IBlockRepository? BlockRepository { get; private set; }
 }

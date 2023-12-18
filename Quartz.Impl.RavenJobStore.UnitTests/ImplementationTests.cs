@@ -568,11 +568,13 @@ public class ImplementationTests : TestBase
 
         using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
         {
-            await arrangeSession.StoreAsync
+            await Target.BlockRepository!.BlockJobAsync
             (
-                new BlockedJob(Target.InstanceName,
-                    job.Key.GetDatabaseId(Target.InstanceName))
+                arrangeSession,
+                job.Key.GetDatabaseId(Target.InstanceName),
+                CancellationToken.None
             );
+
             await arrangeSession.SaveChangesAsync();
         }
 
@@ -600,11 +602,13 @@ public class ImplementationTests : TestBase
 
         using (var arrangeSession = Target.DocumentStore!.OpenAsyncSession())
         {
-            await arrangeSession.StoreAsync
+            await Target.BlockRepository!.BlockJobAsync
             (
-                new BlockedJob(Target.InstanceName,
-                    job.Key.GetDatabaseId(Target.InstanceName))
+                arrangeSession,
+                job.Key.GetDatabaseId(Target.InstanceName),
+                CancellationToken.None
             );
+
             await arrangeSession.SaveChangesAsync();
         }
 
@@ -1274,7 +1278,7 @@ public class ImplementationTests : TestBase
         await Target.ClearAllSchedulingDataAsync(CancellationToken.None);
     
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var anyBlocks = await Target.GetBlockedJobsAsync(session, CancellationToken.None);
+        var anyBlocks = await Target.BlockRepository!.GetBlockedJobsAsync(session, CancellationToken.None);
 
         anyBlocks.Should().BeEmpty();
     }
@@ -1788,10 +1792,7 @@ public class ImplementationTests : TestBase
             );
             entity.State = InternalTriggerState.Error;
 
-            await session.StoreAsync
-            (
-                new BlockedJob(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName))
-            );
+            await Target.BlockRepository!.BlockJobAsync(session, entity.JobId, CancellationToken.None);
 
             await session.SaveChangesAsync();
         }
@@ -2152,9 +2153,11 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            await session.StoreAsync
+            await Target.BlockRepository!.BlockJobAsync
             (
-                new BlockedJob(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName))
+                session,
+                job.Key.GetDatabaseId(Target.InstanceName),
+                CancellationToken.None
             );
 
             await session.SaveChangesAsync();
@@ -2324,11 +2327,13 @@ public class ImplementationTests : TestBase
 
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            await session.StoreAsync
+            await Target.BlockRepository!.BlockJobAsync
             (
-                new BlockedJob(Target.InstanceName, Job.GetId(Target.InstanceName, "Group", "Job"))
+                session,
+                job.Key.GetDatabaseId(Target.InstanceName),
+                CancellationToken.None
             );
-            
+
             await session.SaveChangesAsync();
         }
         
@@ -3166,13 +3171,14 @@ public class ImplementationTests : TestBase
         
         using (var session = Target.DocumentStore!.OpenAsyncSession())
         {
-            var blockedJobExists = await session.Advanced.ExistsAsync
+            var isJobBlocked = await Target.BlockRepository!.IsJobBlockedAsync
             (
-                BlockedJob.GetId(Target.InstanceName, job.Key.GetDatabaseId(Target.InstanceName)),
+                session,
+                job.Key.GetDatabaseId(Target.InstanceName),
                 CancellationToken.None
             );
             
-            blockedJobExists.Should().BeFalse();
+            isJobBlocked.Should().BeFalse();
         }
     }
 
@@ -3195,7 +3201,7 @@ public class ImplementationTests : TestBase
         }
 
         using var session = Target.DocumentStore!.OpenAsyncSession();
-        var result = await Target.IsJobBlockedAsync
+        var result = await Target.BlockRepository!.IsJobBlockedAsync
         (
             session,
             new JobKey("Job-BusinessTransactions/InvoiceToIntercompany-DispatchToIntercompany", "Group").GetDatabaseId(Target.InstanceName),
