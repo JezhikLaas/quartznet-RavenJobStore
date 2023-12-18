@@ -22,7 +22,7 @@ internal class Job : SerializeQuartzData
         RequestsRecovery = job.RequestsRecovery;
     }
 
-    public static string GetId(string scheduler, string group, string name) =>
+    private static string GetId(string scheduler, string group, string name) =>
         $"J{scheduler}/{group}/{name}";
 
     [JsonProperty]

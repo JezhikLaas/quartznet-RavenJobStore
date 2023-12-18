@@ -29,3 +29,4 @@ include:
   - name: MemberCanBeMadeStatic.Global
   - name: MemberCanBeMadeStatic.Local
   - name: UnusedParameter.Global
+  - name: MemberCanBePrivate.Global

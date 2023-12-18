@@ -12,7 +12,7 @@ internal class PausedJobGroup
     }
     
     public static string GetId(string scheduler, string group) =>
-        $"J{scheduler}#{group}";
+        $"JG{scheduler}#{group}";
     
     [JsonProperty]
     public string Id { get; set; }

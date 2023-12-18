@@ -12,7 +12,7 @@ internal class PausedTriggerGroup
     }
 
     public static string GetId(string scheduler, string group) =>
-        $"T{scheduler}#{group}";
+        $"TG{scheduler}#{group}";
     
     [JsonProperty]
     public string Id { get; set; }
