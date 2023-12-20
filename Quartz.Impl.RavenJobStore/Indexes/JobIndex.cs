@@ -11,7 +11,8 @@ internal class JobIndex : AbstractIndexCreationTask<Job>
             select new
             {
                 job.Scheduler,
-                job.RequestsRecovery
+                job.RequestsRecovery,
+                job.Group
             };
     }
 }

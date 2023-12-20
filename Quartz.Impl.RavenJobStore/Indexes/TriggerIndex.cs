@@ -16,7 +16,8 @@ internal class TriggerIndex : AbstractIndexCreationTask<Trigger>
                 trigger.JobId,
                 trigger.State,
                 trigger.NextFireTimeUtc,
-                trigger.Priority
+                trigger.Priority,
+                trigger.Group
             };
     }
 }

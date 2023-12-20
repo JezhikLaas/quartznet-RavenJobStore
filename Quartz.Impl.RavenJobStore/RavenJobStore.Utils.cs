@@ -5,8 +5,10 @@ using Domla.Quartz.Raven.Entities;
 using Domla.Quartz.Raven.Indexes;
 using Microsoft.Extensions.Logging;
 using Quartz;
+using Quartz.Impl.Matchers;
 using Quartz.Simpl;
 using Quartz.Spi;
+using Quartz.Util;
 using Raven.Client.Documents;
 using Raven.Client.Documents.Indexes;
 using Raven.Client.Documents.Linq;
@@ -399,6 +401,35 @@ public partial class RavenJobStore
         ).Skip(skip).Take(count).ToListAsync(token).ConfigureAwait(false);
         
         result.ForEach(x => buffer.Enqueue(x, -x.Priority));
+    }
+
+    private (bool clientMatch, IRavenQueryable<T>) GetMatcherWhereClause<T, TKey>(
+        IRavenQueryable<T> source,
+        GroupMatcher<TKey> matcher) where T : IGroupedElement where TKey : Key<TKey> 
+    {
+        if (matcher.CompareWithOperator.Equals(StringOperator.Equality))
+        {
+            return (false, source.Where(x => x.Group == matcher.CompareToValue));
+        }
+        
+        if (matcher.CompareWithOperator.Equals(StringOperator.StartsWith))
+        {
+            return (false, source.Where(x => x.Group.StartsWith(matcher.CompareToValue)));
+        }
+        
+        if (matcher.CompareWithOperator.Equals(StringOperator.EndsWith))
+        {
+            return (false, source.Where(x => x.Group.EndsWith(matcher.CompareToValue)));
+        }
+        
+        if (matcher.CompareWithOperator.Equals(StringOperator.Anything))
+        {
+            return (false, source);
+        }
+
+        // Contains
+        // We cannot execute a 'contains', at least without an FTS index.
+        return (true, source);
     }
 
     private async Task WaitForIndexingAsync(params string[] names)

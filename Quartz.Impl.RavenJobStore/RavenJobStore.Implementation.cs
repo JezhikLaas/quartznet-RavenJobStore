@@ -885,24 +885,36 @@ public partial class RavenJobStore
         TraceEnter(Logger);
 
         await WaitForIndexingAsync(nameof(JobIndex)).ConfigureAwait(false);
-
+        
         using var session = GetNonWaitingSession();
         
         var query = session
             .Query<Job>(nameof(JobIndex))
-            .Where(x => x.Scheduler == InstanceName)
-            .ProjectInto<JobKey>();
+            .Where(x => x.Scheduler == InstanceName);
+
+        (var clientMatch, query) = GetMatcherWhereClause(query, matcher);
+        var projection = query.ProjectInto<JobKey>();
         
         await using var stream = await session
             .Advanced
-            .StreamAsync(query, token)
+            .StreamAsync(projection, token)
             .ConfigureAwait(false);
 
         var result = new HashSet<JobKey>();
 
-        while (await stream.MoveNextAsync().ConfigureAwait(false))
+        if (clientMatch)
         {
-            if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+            while (await stream.MoveNextAsync().ConfigureAwait(false))
+            {
+                if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+            }
+        }
+        else
+        {
+            while (await stream.MoveNextAsync().ConfigureAwait(false))
+            {
+                result.Add(stream.Current.Document);
+            }
         }
 
         TraceExit(Logger, result);
@@ -922,19 +934,31 @@ public partial class RavenJobStore
         
         var query = session
             .Query<Trigger>(nameof(TriggerIndex))
-            .Where(x => x.Scheduler == InstanceName)
-            .ProjectInto<TriggerKey>();
+            .Where(x => x.Scheduler == InstanceName);
+
+        (var clientMatch, query) = GetMatcherWhereClause(query, matcher);
+        var projection = query.ProjectInto<TriggerKey>();
 
         await using var stream = await session
             .Advanced
-            .StreamAsync(query, token)
+            .StreamAsync(projection, token)
             .ConfigureAwait(false);
 
         var result = new HashSet<TriggerKey>();
 
-        while (await stream.MoveNextAsync().ConfigureAwait(false))
+        if (clientMatch)
         {
-            if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+            while (await stream.MoveNextAsync().ConfigureAwait(false))
+            {
+                if (matcher.IsMatch(stream.Current.Document)) result.Add(stream.Current.Document);
+            }
+        }
+        else
+        {
+            while (await stream.MoveNextAsync().ConfigureAwait(false))
+            {
+                result.Add(stream.Current.Document);
+            }
         }
 
         TraceExit(Logger, result);

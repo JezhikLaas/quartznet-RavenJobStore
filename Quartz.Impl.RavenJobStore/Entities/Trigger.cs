@@ -5,7 +5,7 @@ using Quartz.Spi;
 
 namespace Domla.Quartz.Raven.Entities;
 
-internal class Trigger : SerializeQuartzData
+internal class Trigger : SerializeQuartzData, IGroupedElement
 {
     public Trigger(IOperableTrigger? trigger, string schedulerInstanceName)
     {

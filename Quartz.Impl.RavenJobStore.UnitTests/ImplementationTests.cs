@@ -1569,6 +1569,52 @@ public class ImplementationTests : TestBase
             .ContainSingle(x => x.Group == "2Group" && x.Name == "Job");
     }
 
+    [Fact(DisplayName = "If a group matcher contains is used Then GetJobKeys finds entries")]
+    public async Task If_a_group_matcher_contains_is_used_Then_GetJobKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "1Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "2Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "3Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobKeysAsync
+        (
+            GroupMatcher<JobKey>.GroupContains("Group"), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(3);
+    }
+
+    [Fact(DisplayName = "If a group matcher any is used Then GetJobKeys finds entries")]
+    public async Task If_a_group_matcher_any_is_used_Then_GetJobKeys_finds_entries()
+    {
+        await Target.SchedulerStartedAsync(CancellationToken.None);
+
+        var job = new JobDetailImpl("Job", "1Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "2Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        job = new JobDetailImpl("Job", "3Group!", typeof(NoOpJob));
+        await Target.StoreJobAsync(job, false, CancellationToken.None);
+
+        var result = await Target.GetJobKeysAsync
+        (
+            GroupMatcher<JobKey>.AnyGroup(), CancellationToken.None
+        );
+
+        result.Should()
+            .HaveCount(3);
+    }
+
     [Fact(DisplayName = "If a group matcher equals is used Then GetTriggerKeys finds entries")]
     public async Task If_a_group_matcher_equals_is_used_Then_GetTriggerKeys_finds_entries()
     {

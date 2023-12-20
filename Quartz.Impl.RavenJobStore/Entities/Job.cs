@@ -3,7 +3,7 @@ using Quartz;
 
 namespace Domla.Quartz.Raven.Entities;
 
-internal class Job : SerializeQuartzData
+internal class Job : SerializeQuartzData, IGroupedElement
 {
     public Job(IJobDetail? job, string schedulerInstanceName)
     {
@@ -57,6 +57,11 @@ internal class Job : SerializeQuartzData
         get => (IJobDetail?)Deserialize(QuartzData);
         set => QuartzData = Serialize(value);
     }
+}
+
+internal interface IGroupedElement
+{
+    string Group { get; set; }
 }
 
 internal static class JobKeyExtensions
