@@ -59,11 +59,6 @@ internal class Job : SerializeQuartzData, IGroupedElement
     }
 }
 
-internal interface IGroupedElement
-{
-    string Group { get; set; }
-}
-
 internal static class JobKeyExtensions
 {
     public static string GetDatabaseId(this JobKey? jobKey, string schedulerName) => 

@@ -403,7 +403,7 @@ public partial class RavenJobStore
         result.ForEach(x => buffer.Enqueue(x, -x.Priority));
     }
 
-    private (bool clientMatch, IRavenQueryable<T>) GetMatcherWhereClause<T, TKey>(
+    private static (bool clientMatch, IRavenQueryable<T>) GetMatcherWhereClause<T, TKey>(
         IRavenQueryable<T> source,
         GroupMatcher<TKey> matcher) where T : IGroupedElement where TKey : Key<TKey> 
     {
